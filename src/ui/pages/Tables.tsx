@@ -1,7 +1,18 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../App.tsx'
-import { api, elapsed, money } from '../api.ts'
+import { api, elapsed, money, type Table } from '../api.ts'
+
+const CANVAS_W = 1000
+const CANVAS_H = 600
+
+/** Konum hiç verilmemişse (0,0) ızgara yerleşimine düş. */
+function positionOf(t: Table, index: number) {
+  if (t.x !== 0 || t.y !== 0) return { x: t.x, y: t.y, w: t.w, h: t.h }
+  const col = index % 3
+  const row = Math.floor(index / 3)
+  return { x: 70 + col * 300, y: 60 + row * 185, w: 120, h: 110 }
+}
 
 export default function Tables() {
   const { boot, refresh } = useApp()
@@ -73,37 +84,60 @@ export default function Tables() {
       </div>
 
       <div className="tables-layout">
-        <div className="table-grid">
-          {(active?.tables ?? []).map((t) => {
-            const o = t.order
-            const sent = o ? o.sent_lines > 0 : false
-            return (
-              <button
-                key={t.id}
-                className={`table-card${o ? ' busy' : ''}${sent ? ' sent' : ''}`}
-                disabled={busy === t.id}
-                onClick={() => void openTable(t.id, o?.id)}
-              >
-                <div className="table-top">
-                  <div>
-                    <div className="table-name">{t.name}</div>
-                    <div className="table-meta">{t.seats} kişilik</div>
-                  </div>
-                  {o ? <span className="pill warn">{elapsed(o.opened_at)}</span> : <span className="pill">Boş</span>}
-                </div>
-                <div className="table-foot">
+        <div className="plan-wrap">
+          <div className="plan-canvas pos-plan">
+            <div className="plan-grid" />
+            {(active?.tables ?? []).map((t, i) => {
+              const p = positionOf(t, i)
+              const o = t.order
+              const cls = [
+                'plan-table',
+                'pos',
+                t.shape === 'round' ? 'round' : t.shape === 'rect' ? 'rect' : 'square',
+                o ? 'busy' : 'free',
+                o && o.sent_lines > 0 ? 'sent' : '',
+                busy === t.id ? 'loading' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')
+              return (
+                <button
+                  key={t.id}
+                  className={cls}
+                  style={{
+                    left: `${(p.x / CANVAS_W) * 100}%`,
+                    top: `${(p.y / CANVAS_H) * 100}%`,
+                    width: `${(p.w / CANVAS_W) * 100}%`,
+                    height: `${(p.h / CANVAS_H) * 100}%`,
+                  }}
+                  disabled={busy === t.id}
+                  onClick={() => void openTable(t.id, o?.id)}
+                >
+                  <b>{t.name}</b>
                   {o ? (
                     <>
-                      <div className="table-total">{money(o.total)}</div>
-                      <span className="pill ok">{o.line_count} ürün</span>
+                      <span className="plan-total">{money(o.total)}</span>
+                      <span className="plan-meta">
+                        {o.line_count} ürün · {elapsed(o.opened_at)}
+                      </span>
                     </>
                   ) : (
-                    <span className="table-empty">Dokun → adisyon aç</span>
+                    <span className="plan-meta">{t.seats} kişilik</span>
                   )}
-                </div>
-              </button>
-            )
-          })}
+                </button>
+              )
+            })}
+            {(active?.tables ?? []).length === 0 && (
+              <div className="plan-empty">
+                Bu bölmede masa yok.
+                <br />
+                <span style={{ fontSize: 11.5 }}>Yönetim → Masa Düzeni’nden ekleyebilirsin.</span>
+              </div>
+            )}
+          </div>
+          <div className="plan-hint">
+            {active?.name} · {active?.tables.length ?? 0} masa · plan görünümü (Yönetim → Masa Düzeni’nde düzenlenir)
+          </div>
         </div>
 
         <aside className="side-panel panel">

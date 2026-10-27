@@ -36,6 +36,16 @@
 - [ ] Masa birleştirme, yarım-yarım pizza UI’ı
 - [ ] Gecelik otomatik yedek
 
+## Faz 5 — Masa düzeni + ürün görselleri (tamam)
+- [x] Şema: `tables.shape/x/y/w/h`, `products.image_url` (idempotent `ALTER TABLE ... IF NOT EXISTS`)
+- [x] Bölme CRUD + masa CRUD + toplu konum kaydı (`PUT /api/admin/layout`)
+- [x] Sürükle-bırak plan editörü (şekil, kişi, boyut, çakışma uyarısı, sınır kırpma)
+- [x] POS masa ekranı plan görünümü (yuvarlak/kare/dikdörtgen, dolu-boş renkleri, süre)
+- [x] Ürün görseli yükleme (multipart, 5 MB, JPEG/PNG/WEBP) + sipariş kartlarında gösterim
+- [x] Demo görsel üretici (`scripts/make_food_images.py`), 18 ürüne uygulandı
+- [x] `scripts/e2e_layout.py`: 16 doğrulama (CRUD, kalıcılık, sınır, silme korumaları)
+- [x] Tarayıcıda sürükle-bırak testi (pointer olaylarıyla) ve kayıt doğrulaması
+
 ## Sonraki sürüm (v0.2)
 1. **Paket servis**: müşteri/adres defteri, bölge, kurye ataması, teslim durumu
 2. **QR menü / online sipariş**: mevcut WordPress kurulumuna bağlanır

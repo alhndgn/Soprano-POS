@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, money, type Role } from '../api.ts'
+import LayoutEditor from '../components/LayoutEditor.tsx'
 
 type MenuRow = Awaited<ReturnType<typeof api.adminMenu>>[number]
 type StaffRow = Awaited<ReturnType<typeof api.staff>>[number]
@@ -7,11 +8,12 @@ type StaffRow = Awaited<ReturnType<typeof api.staff>>[number]
 const ROLE_LABEL: Record<Role, string> = { manager: 'Yönetici', cashier: 'Kasiyer', waiter: 'Garson' }
 
 export default function Admin() {
-  const [tab, setTab] = useState<'menu' | 'staff'>('menu')
+  const [tab, setTab] = useState<'menu' | 'staff' | 'layout'>('layout')
   const [menu, setMenu] = useState<MenuRow[]>([])
   const [staff, setStaff] = useState<StaffRow[]>([])
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState({ name: '', role: 'waiter' as Role, pin: '' })
+  const [uploading, setUploading] = useState<number | null>(null)
 
   const load = () => {
     api.adminMenu().then(setMenu).catch((e) => setError(e.message))
@@ -19,6 +21,29 @@ export default function Admin() {
   }
 
   useEffect(load, [])
+
+  const upload = async (id: number, file?: File | null) => {
+    if (!file) return
+    setUploading(id)
+    setError(null)
+    try {
+      await api.uploadImage(id, file)
+      load()
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setUploading(null)
+    }
+  }
+
+  const removeImage = async (id: number) => {
+    try {
+      await api.deleteImage(id)
+      load()
+    } catch (e: any) {
+      setError(e.message)
+    }
+  }
 
   const addStaff = async () => {
     try {
@@ -35,13 +60,16 @@ export default function Admin() {
       <div className="page-head">
         <div>
           <h1>Yönetim</h1>
-          <div className="sub">Menü ve personel</div>
+          <div className="sub">Masa düzeni · menü ve görseller · personel</div>
         </div>
       </div>
 
       {error && <div className="toast error">{error}</div>}
 
       <div className="tabs">
+        <button className={`tab${tab === 'layout' ? ' on' : ''}`} onClick={() => setTab('layout')}>
+          Masa Düzeni
+        </button>
         <button className={`tab${tab === 'menu' ? ' on' : ''}`} onClick={() => setTab('menu')}>
           Menü ({menu.length})
         </button>
@@ -50,11 +78,18 @@ export default function Admin() {
         </button>
       </div>
 
+      {tab === 'layout' && <LayoutEditor onError={setError} />}
+
       {tab === 'menu' && (
         <div className="panel">
+          <div className="panel-head">
+            <h3>Ürünler ve görseller</h3>
+            <span className="pill">JPEG / PNG / WEBP · en fazla 5 MB</span>
+          </div>
           <table className="data-table">
             <thead>
               <tr>
+                <th style={{ width: 74 }}>Görsel</th>
                 <th>Ürün</th>
                 <th>Kategori</th>
                 <th>KDV</th>
@@ -65,7 +100,34 @@ export default function Admin() {
               {menu.map((p) => (
                 <tr key={p.id}>
                   <td>
+                    {p.image_url ? (
+                      <img className="menu-thumb" src={p.image_url} alt={p.name} />
+                    ) : (
+                      <div className="menu-thumb empty">—</div>
+                    )}
+                  </td>
+                  <td>
                     <b>{p.name}</b>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 5 }}>
+                      <label className="btn ghost sm" style={{ padding: '4px 9px', fontSize: 11.5 }}>
+                        {uploading === p.id ? 'Yükleniyor…' : p.image_url ? 'Değiştir' : 'Görsel yükle'}
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          hidden
+                          onChange={(e) => void upload(p.id, e.target.files?.[0])}
+                        />
+                      </label>
+                      {p.image_url && (
+                        <button
+                          className="btn ghost sm"
+                          style={{ padding: '4px 9px', fontSize: 11.5, color: 'var(--danger)' }}
+                          onClick={() => void removeImage(p.id)}
+                        >
+                          Kaldır
+                        </button>
+                      )}
+                    </div>
                   </td>
                   <td style={{ color: 'var(--muted)' }}>{p.category}</td>
                   <td style={{ color: 'var(--muted)' }}>%{p.vat_rate}</td>

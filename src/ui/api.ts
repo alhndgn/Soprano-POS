@@ -5,10 +5,12 @@ export type Me = { id: number; name: string; role: Role }
 export type Variant = { id: number; product_id: number; name: string; price: number }
 export type Modifier = { id: number; group_id: number; name: string; price: number }
 export type ModGroup = { id: number; name: string; min: number; max: number; modifiers: Modifier[] }
+export type TableShape = 'square' | 'round' | 'rect'
 export type Product = {
   id: number
   name: string
   vatRate: number
+  imageUrl: string | null
   variants: Variant[]
   groups: ModGroup[]
 }
@@ -22,7 +24,32 @@ export type OpenOrder = {
   sent_lines: number
   line_count: number
 }
-export type Table = { id: number; floor_id: number; name: string; seats: number; order: OpenOrder | null }
+export type Table = {
+  id: number
+  floor_id: number
+  name: string
+  seats: number
+  shape: TableShape
+  x: number
+  y: number
+  w: number
+  h: number
+  order: OpenOrder | null
+}
+
+export type LayoutTable = {
+  id: number
+  floor_id: number
+  name: string
+  seats: number
+  shape: TableShape
+  x: number
+  y: number
+  w: number
+  h: number
+  sort: number
+}
+export type LayoutFloor = { id: number; name: string; sort: number; tables: LayoutTable[] }
 export type Floor = { id: number; name: string; tables: Table[] }
 export type Shift = { id: number; opened_at: string; opening_float: number } | null
 
@@ -142,13 +169,49 @@ export const api = {
       hourly: { hour: number; amount: number }[]
     }>('GET', `/api/reports/daily${date ? `?date=${date}` : ''}`),
   adminMenu: () =>
-    request<{ id: number; name: string; vat_rate: number; category: string; category_id: number; variants: Variant[] }[]>(
-      'GET',
-      '/api/admin/menu',
-    ),
+    request<
+      {
+        id: number
+        name: string
+        vat_rate: number
+        image_url: string | null
+        category: string
+        category_id: number
+        variants: Variant[]
+      }[]
+    >('GET', '/api/admin/menu'),
   staff: () => request<{ id: number; name: string; role: Role; active: boolean }[]>('GET', '/api/admin/staff'),
   addStaff: (body: { name: string; role: Role; pin: string }) =>
     request('POST', '/api/admin/staff', body),
+
+  // masa düzeni
+  layout: () => request<LayoutFloor[]>('GET', '/api/admin/layout'),
+  addFloor: (name: string) => request<{ id: number; name: string }>('POST', '/api/admin/floors', { name }),
+  renameFloor: (id: number, name: string) => request('PATCH', `/api/admin/floors/${id}`, { name }),
+  deleteFloor: (id: number) => request('DELETE', `/api/admin/floors/${id}`),
+  addTable: (body: { floorId: number; name?: string; seats?: number; shape?: TableShape; x?: number; y?: number }) =>
+    request<LayoutTable>('POST', '/api/admin/tables', body),
+  patchTable: (id: number, body: { name?: string; seats?: number; shape?: TableShape; floorId?: number }) =>
+    request<LayoutTable>('PATCH', `/api/admin/tables/${id}`, body),
+  deleteTable: (id: number) => request('DELETE', `/api/admin/tables/${id}`),
+  saveLayout: (floorId: number, tables: { id: number; x: number; y: number; w: number; h: number; shape?: TableShape }[]) =>
+    request<{ ok: boolean; saved: number }>('PUT', '/api/admin/layout', { floorId, tables }),
+
+  // ürün görseli
+  uploadImage: async (productId: number, file: File) => {
+    const token = auth.get()
+    const body = new FormData()
+    body.append('file', file)
+    const res = await fetch(`/api/admin/products/${productId}/image`, {
+      method: 'POST',
+      headers: token ? { authorization: `Bearer ${token}` } : undefined,
+      body,
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new ApiError(data.error ?? 'Görsel yüklenemedi', res.status)
+    return data as { ok: boolean; imageUrl: string }
+  },
+  deleteImage: (productId: number) => request('DELETE', `/api/admin/products/${productId}/image`),
 }
 
 // ---------- biçimlendirme ----------

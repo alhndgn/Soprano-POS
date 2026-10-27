@@ -1,5 +1,9 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
+import { createWriteStream } from 'node:fs'
+import { mkdir, unlink } from 'node:fs/promises'
+import { pipeline } from 'node:stream/promises'
+import path from 'node:path'
 import { db } from './db/client.ts'
 import { hashPin, loginWithPin, logout, requireRole, userForToken, type AuthUser } from './auth.ts'
 import { orderTotals, type PricedLine } from './money.ts'
@@ -122,7 +126,8 @@ export async function registerRoutes(app: FastifyInstance) {
       )
       const floors = await db.all<any>(`SELECT id, name FROM floors ORDER BY sort, id`)
       const tables = await db.all<any>(
-        `SELECT id, floor_id, name, seats FROM tables WHERE active = true ORDER BY sort, id`,
+        `SELECT id, floor_id, name, seats, shape, x, y, w, h
+         FROM tables WHERE active = true ORDER BY sort, id`,
       )
       const openOrders = await db.all<any>(
         `SELECT o.id, o.table_id, o.guest_count, o.opened_at, o.status,
@@ -136,7 +141,7 @@ export async function registerRoutes(app: FastifyInstance) {
       )
       const categories = await db.all<any>(`SELECT id, name, emoji FROM categories ORDER BY sort, id`)
       const products = await db.all<any>(
-        `SELECT id, category_id, name, vat_rate FROM products WHERE active = true ORDER BY sort, id`,
+        `SELECT id, category_id, name, vat_rate, image_url FROM products WHERE active = true ORDER BY sort, id`,
       )
       const variants = await db.all<any>(
         `SELECT id, product_id, name, price FROM variants WHERE active = true ORDER BY sort, id`,
@@ -167,6 +172,7 @@ export async function registerRoutes(app: FastifyInstance) {
               id: p.id,
               name: p.name,
               vatRate: p.vat_rate,
+              imageUrl: p.image_url,
               variants: variants.filter((v) => v.product_id === p.id),
               groups: pmg
                 .filter((x) => x.product_id === p.id)
@@ -529,7 +535,7 @@ export async function registerRoutes(app: FastifyInstance) {
     scope.get('/api/admin/menu', async (req) => {
       requireRole(user(req), ['manager'])
       const products = await db.all<any>(
-        `SELECT p.id, p.name, p.vat_rate, c.name AS category, c.id AS category_id
+        `SELECT p.id, p.name, p.vat_rate, p.image_url, c.name AS category, c.id AS category_id
          FROM products p JOIN categories c ON c.id=p.category_id ORDER BY c.sort, p.sort`,
       )
       const variants = await db.all<any>(`SELECT id, product_id, name, price FROM variants ORDER BY product_id, sort`)
@@ -545,6 +551,211 @@ export async function registerRoutes(app: FastifyInstance) {
       requireRole(user(req), ['manager'])
       const body = z.object({ name: z.string().min(2), role: z.enum(['waiter', 'cashier', 'manager']), pin: z.string().min(3).max(12) }).parse(req.body)
       return db.one(`INSERT INTO users (name, role, pin_hash) VALUES ($1,$2,$3) RETURNING id, name, role`, [body.name, body.role, hashPin(body.pin)])
+    })
+
+    // ---------- masa düzeni (bölmeler + masalar) ----------
+    const CANVAS_W = 1000
+    const CANVAS_H = 600
+
+    scope.get('/api/admin/layout', async (req) => {
+      requireRole(user(req), ['manager'])
+      const floors = await db.all<any>(`SELECT id, name, sort FROM floors ORDER BY sort, id`)
+      const tables = await db.all<any>(
+        `SELECT id, floor_id, name, seats, shape, x, y, w, h, sort
+         FROM tables WHERE active = true ORDER BY floor_id, sort, id`,
+      )
+      return floors.map((f) => ({ ...f, tables: tables.filter((t) => t.floor_id === f.id) }))
+    })
+
+    scope.post('/api/admin/floors', async (req) => {
+      requireRole(user(req), ['manager'])
+      const { name } = z.object({ name: z.string().min(1).max(40) }).parse(req.body)
+      const sort = await db.one<{ n: number }>(`SELECT COALESCE(MAX(sort), 0) + 1 AS n FROM floors`)
+      return db.one(`INSERT INTO floors (name, sort) VALUES ($1,$2) RETURNING *`, [name, sort!.n])
+    })
+
+    scope.patch('/api/admin/floors/:id', async (req) => {
+      requireRole(user(req), ['manager'])
+      const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
+      const { name } = z.object({ name: z.string().min(1).max(40) }).parse(req.body)
+      return db.one(`UPDATE floors SET name=$1 WHERE id=$2 RETURNING *`, [name, id])
+    })
+
+    scope.delete('/api/admin/floors/:id', async (req) => {
+      requireRole(user(req), ['manager'])
+      const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
+      const used = await db.one<{ c: number }>(`SELECT count(*)::int AS c FROM tables WHERE floor_id=$1 AND active=true`, [id])
+      if (used && used.c > 0) {
+        const e: any = new Error(`Bu bölmede ${used.c} masa var — önce masaları sil`)
+        e.statusCode = 400
+        throw e
+      }
+      const total = await db.one<{ c: number }>(`SELECT count(*)::int AS c FROM floors`)
+      if (total && total.c <= 1) {
+        const e: any = new Error('Son bölme silinemez')
+        e.statusCode = 400
+        throw e
+      }
+      await db.one(`DELETE FROM floors WHERE id=$1 RETURNING id`, [id])
+      return { ok: true }
+    })
+
+    scope.post('/api/admin/tables', async (req) => {
+      requireRole(user(req), ['manager'])
+      const body = z
+        .object({
+          floorId: z.number().int().positive(),
+          name: z.string().min(1).max(30).optional(),
+          seats: z.number().int().min(1).max(30).default(4),
+          shape: z.enum(['square', 'round', 'rect']).default('square'),
+          x: z.number().int().min(0).max(CANVAS_W).default(60),
+          y: z.number().int().min(0).max(CANVAS_H).default(60),
+        })
+        .parse(req.body)
+      const size = body.shape === 'rect' ? { w: 170, h: 110 } : { w: 120, h: 110 }
+      const count = await db.one<{ n: number }>(
+        `SELECT count(*)::int AS n FROM tables WHERE floor_id=$1 AND active=true`,
+        [body.floorId],
+      )
+      const name = body.name?.trim() || `Masa ${(count?.n ?? 0) + 1}`
+      return db.one(
+        `INSERT INTO tables (floor_id, name, seats, shape, x, y, w, h, sort)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+        [body.floorId, name, body.seats, body.shape, body.x, body.y, size.w, size.h, (count?.n ?? 0) + 1],
+      )
+    })
+
+    scope.patch('/api/admin/tables/:id', async (req) => {
+      requireRole(user(req), ['manager'])
+      const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
+      const body = z
+        .object({
+          name: z.string().min(1).max(30).optional(),
+          seats: z.number().int().min(1).max(30).optional(),
+          shape: z.enum(['square', 'round', 'rect']).optional(),
+          floorId: z.number().int().positive().optional(),
+        })
+        .parse(req.body)
+      const current = await db.one<any>(`SELECT * FROM tables WHERE id=$1`, [id])
+      if (!current) {
+        const e: any = new Error('Masa bulunamadı')
+        e.statusCode = 404
+        throw e
+      }
+      const shape = body.shape ?? current.shape
+      const size =
+        body.shape && body.shape !== current.shape
+          ? body.shape === 'rect'
+            ? { w: 170, h: 110 }
+            : { w: 120, h: 110 }
+          : { w: current.w, h: current.h }
+      return db.one(
+        `UPDATE tables SET name=$1, seats=$2, shape=$3, floor_id=$4, w=$5, h=$6 WHERE id=$7 RETURNING *`,
+        [body.name ?? current.name, body.seats ?? current.seats, shape, body.floorId ?? current.floor_id, size.w, size.h, id],
+      )
+    })
+
+    scope.delete('/api/admin/tables/:id', async (req) => {
+      requireRole(user(req), ['manager'])
+      const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
+      const open = await db.one<{ c: number }>(
+        `SELECT count(*)::int AS c FROM orders WHERE table_id=$1 AND status='open'`,
+        [id],
+      )
+      if (open && open.c > 0) {
+        const e: any = new Error('Masada açık adisyon var — önce ödemeyi al')
+        e.statusCode = 400
+        throw e
+      }
+      await db.one(`UPDATE tables SET active=false WHERE id=$1 RETURNING id`, [id])
+      return { ok: true }
+    })
+
+    // Sürükle-bırak sonrası toplu konum kaydı
+    scope.put('/api/admin/layout', async (req) => {
+      requireRole(user(req), ['manager'])
+      const body = z
+        .object({
+          floorId: z.number().int().positive(),
+          tables: z
+            .array(
+              z.object({
+                id: z.number().int().positive(),
+                x: z.number().int(),
+                y: z.number().int(),
+                w: z.number().int().min(60).max(400),
+                h: z.number().int().min(60).max(400),
+                shape: z.enum(['square', 'round', 'rect']).optional(),
+              }),
+            )
+            .max(200),
+        })
+        .parse(req.body)
+
+      for (const t of body.tables) {
+        const x = Math.max(0, Math.min(t.x, CANVAS_W - t.w))
+        const y = Math.max(0, Math.min(t.y, CANVAS_H - t.h))
+        await db.one(
+          `UPDATE tables SET x=$1, y=$2, w=$3, h=$4, shape=COALESCE($5, shape)
+           WHERE id=$6 AND floor_id=$7 RETURNING id`,
+          [x, y, t.w, t.h, t.shape ?? null, t.id, body.floorId],
+        )
+      }
+      broadcast()
+      return { ok: true, saved: body.tables.length }
+    })
+
+    // ---------- ürün görseli ----------
+    const IMAGE_TYPES: Record<string, string> = {
+      'image/jpeg': 'jpg',
+      'image/png': 'png',
+      'image/webp': 'webp',
+    }
+
+    scope.post('/api/admin/products/:id/image', async (req) => {
+      requireRole(user(req), ['manager'])
+      const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
+      const product = await db.one<any>(`SELECT id, name, image_url FROM products WHERE id=$1`, [id])
+      if (!product) {
+        const e: any = new Error('Ürün bulunamadı')
+        e.statusCode = 404
+        throw e
+      }
+      const file = await (req as any).file()
+      if (!file) {
+        const e: any = new Error('Dosya gelmedi')
+        e.statusCode = 400
+        throw e
+      }
+      const ext = IMAGE_TYPES[file.mimetype]
+      if (!ext) {
+        const e: any = new Error('Sadece JPEG, PNG veya WEBP yüklenebilir')
+        e.statusCode = 400
+        throw e
+      }
+      const dir = path.join(process.cwd(), 'var', 'uploads', 'products')
+      await mkdir(dir, { recursive: true })
+      const filename = `p${id}-${Date.now()}.${ext}`
+      await pipeline(file.file, createWriteStream(path.join(dir, filename)))
+      const url = `/uploads/products/${filename}`
+      await db.one(`UPDATE products SET image_url=$1 WHERE id=$2 RETURNING id`, [url, id])
+      if (product.image_url?.startsWith('/uploads/')) {
+        const old = path.join(process.cwd(), 'var', product.image_url.replace(/^\/uploads\//, 'uploads/'))
+        unlink(old).catch(() => {})
+      }
+      return { ok: true, imageUrl: url }
+    })
+
+    scope.delete('/api/admin/products/:id/image', async (req) => {
+      requireRole(user(req), ['manager'])
+      const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
+      const product = await db.one<any>(`SELECT image_url FROM products WHERE id=$1`, [id])
+      await db.one(`UPDATE products SET image_url=NULL WHERE id=$1 RETURNING id`, [id])
+      if (product?.image_url?.startsWith('/uploads/')) {
+        const old = path.join(process.cwd(), 'var', product.image_url.replace(/^\/uploads\//, 'uploads/'))
+        unlink(old).catch(() => {})
+      }
+      return { ok: true }
     })
 
     // ---------- canlı olaylar ----------

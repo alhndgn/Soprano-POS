@@ -30,6 +30,8 @@ Başarı kriterleri:
 - Vardiya açma/kapama (açık adisyon varken kapanmaz)
 - Günlük rapor: ciro, adisyon sayısı, ortalama, ödeme dağılımı, saatlik ciro, en çok satanlar
 - Menü ve personel yönetimi (okuma + personel ekleme)
+- **Masa düzeni editörü:** bölme (kat) oluştur/adlandır/sil, masa ekle/sil, kare-yuvarlak-dikdörtgen şekil, sürükle-bırak konum, kişi sayısı, çakışma uyarısı
+- **Ürün görselleri:** menüden JPEG/PNG/WEBP yükleme (5 MB), sipariş kartlarında ve ürün seçim sayfasında gösterim
 
 ### Kapsam dışı (sonraki fazlar)
 Paket servis, kurye takibi, QR/online sipariş, Yemeksepeti–Trendyol Go, ÖKC/e-Arşiv, stok-reçete maliyeti, sadakat/kampanya, masa birleştirme, çok şube yönetimi.
@@ -114,7 +116,24 @@ Yetki sunucuda uygulanır (`requireRole`); arayüz sadece gizler.
 - Arayüz: gerçek tarayıcıda PIN → masa → ürün → gönder → KDS → ödeme akışı elle doğrulandı (ekran görüntüleri `docs/screenshots`).
 - Donanım: yazıcı yoksa `DRY_RUN=1` ile `.bin` + `.txt` üretilir; sahadaki yazıcıda codepage testi gerekir.
 
-## 10. Açık riskler
+## 10. Masa düzeni ve ürün görselleri
+
+### Yerleşim planı
+- Tuval 1000x600 mantıksal birim; her masa `x,y,w,h` ile konumlanır, arayüz yüzdeye çevirir (her ekran boyutunda aynı düzen).
+- Şekil: `square` (kare), `round` (yuvarlak), `rect` (dikdörtgen). Boy değişince genişlik otomatik ayarlanır (120 / 140 / 160 / 170).
+- Bölmeler (`floors`) dış mekan / iç mekan / teras gibi alanlardır; masalar bölmeye bağlıdır.
+- Editör sürükle-bırak ile çalışır; konum 5 birim ızgaraya yuvarlanır, tuval sınırına kırpılır, `PUT /api/admin/layout` ile toplu kaydedilir.
+- Üst üste binen masalar kırmızı tarama ile işaretlenir (kaza ile iç içe kaydetmeyi fark etmek için). Kayıt engellenmez.
+- Açık adisyonu olan masa silinemez; masası olan bölme silinemez; son bölme silinemez.
+- Konumlar hiç atanmamışsa (`x=0,y=0`) sunucu açılışta ızgara düzeni kurar (`db/layout.ts`).
+
+### Görseller
+- `products.image_url` alanı `/uploads/products/...` yolunu tutar; dosyalar `var/uploads/products` altında.
+- Yükleme `multipart/form-data`; sadece JPEG/PNG/WEBP, 5 MB sınırı. Yeni görsel eskisini siler.
+- Görsel yoksa kategori emojisiyle yer tutucu gösterilir; POS görsel olmadan da çalışır.
+- Yedeklemede `var/uploads` klasörü `var/pgdata` ile birlikte alınmalı.
+
+## 11. Açık riskler
 
 1. **ÖKC/e-Arşiv yok** — nakit satışta yasal fiş yükümlülüğü için sonraki faz şart.
 2. **ESC/POS codepage** — model bazlı; varsayılan TR→ASCII çevirisi. CP857 destekleyen yazıcıda `SOPRANO_PRINTER_CP857=1`.
@@ -122,3 +141,5 @@ Yetki sunucuda uygulanır (`requireRole`); arayüz sadece gizler.
 4. **Yedekleme** — `var/pgdata` klasörü; gecelik kopyalama henüz otomatik değil (MVP).
 5. **Masa birleştirme** ve paket servis yok — sözleşmede v2.
 6. **Yazıcı köprüsü uçları** LAN’da açık; `BRIDGE_TOKEN` verilmezse fiş kuyruğunu ağdaki herkes okuyabilir. Sahada token verilmeli.
+7. **Görsel yedekleme** — `var/uploads` ayrı klasör; yedek betiği henüz ikisini birlikte almıyor.
+8. **Masa çakışması** — editör uyarır ama kaydı engellemez; sahada kaza ile üst üste masa bırakılabilir.

@@ -155,12 +155,19 @@ export default function OrderPage() {
             const min = Math.min(...p.variants.map((v) => v.price))
             return (
               <button key={p.id} className="product-card" onClick={() => pickProduct(p)} disabled={busy}>
-                <div className="product-name">{p.name}</div>
-                <div className="product-hint">
-                  {p.variants.length > 1 ? `${p.variants.length} boy` : p.variants[0]?.name}
-                  {p.groups.length ? ` · ${p.groups.length} seçenek` : ''}
+                {p.imageUrl ? (
+                  <img className="product-img" src={p.imageUrl} alt={p.name} loading="lazy" />
+                ) : (
+                  <div className="product-img placeholder">{activeCat?.emoji ?? '🍽'}</div>
+                )}
+                <div className="product-body">
+                  <div className="product-name">{p.name}</div>
+                  <div className="product-hint">
+                    {p.variants.length > 1 ? `${p.variants.length} boy` : p.variants[0]?.name}
+                    {p.groups.length ? ` · ${p.groups.length} seçenek` : ''}
+                  </div>
+                  <div className="product-price">{money(min)}</div>
                 </div>
-                <div className="product-price">{money(min)}</div>
               </button>
             )
           })}
@@ -240,7 +247,10 @@ export default function OrderPage() {
         <div className="sheet-backdrop" onClick={(e) => e.target === e.currentTarget && setSheet(null)}>
           <div className="sheet">
             <div className="sheet-head">
-              <div>
+              {sheet.product.imageUrl && (
+                <img className="sheet-img" src={sheet.product.imageUrl} alt={sheet.product.name} />
+              )}
+              <div style={{ flex: 1 }}>
                 <h3>{sheet.product.name}</h3>
                 <p>
                   {sheet.product.variants.length > 1 ? 'Boy seç' : sheet.product.variants[0]?.name}

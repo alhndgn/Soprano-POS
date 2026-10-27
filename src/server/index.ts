@@ -1,10 +1,12 @@
 import Fastify from 'fastify'
 import cookie from '@fastify/cookie'
+import multipart from '@fastify/multipart'
 import fastifyStatic from '@fastify/static'
 import path from 'node:path'
 import { existsSync } from 'node:fs'
 import { initDb, db } from './db/client.ts'
 import { seed } from './db/seed.ts'
+import { ensureLayout } from './db/layout.ts'
 import { registerRoutes } from './routes.ts'
 import { ZodError } from 'zod'
 
@@ -25,6 +27,7 @@ app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body,
 })
 
 await app.register(cookie)
+await app.register(multipart, { limits: { fileSize: 5 * 1024 * 1024, files: 1 } })
 await initDb()
 
 // İlk açılışta menü/personel/masa yoksa tohumla
@@ -33,6 +36,9 @@ if (!users || users.c === 0) {
   const r = await seed()
   app.log.info({ seed: r }, 'veritabanı tohumlandı')
 }
+
+const layout = await ensureLayout()
+if (layout.placed > 0) app.log.info({ placed: layout.placed }, 'masa yerleşimi kuruldu')
 
 app.setErrorHandler((err: any, req, reply) => {
   if (err instanceof ZodError) {
@@ -53,6 +59,10 @@ if (existsSync(dist)) {
     return reply.sendFile('index.html')
   })
 }
+
+// Yüklenen ürün görselleri
+const uploads = path.join(process.cwd(), 'var', 'uploads')
+await app.register(fastifyStatic, { root: uploads, prefix: '/uploads/', decorateReply: false })
 
 await app.listen({ port: PORT, host: HOST })
 app.log.info(`Soprano POS hazır → http://localhost:${PORT}`)

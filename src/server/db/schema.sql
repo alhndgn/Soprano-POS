@@ -40,6 +40,15 @@ CREATE TABLE IF NOT EXISTS tables (
   active    boolean NOT NULL DEFAULT true
 );
 
+-- Masa düzeni (yerleşim planı): konum/boyut 1000x600 mantıksal tuvalde
+ALTER TABLE tables ADD COLUMN IF NOT EXISTS shape text NOT NULL DEFAULT 'square';
+ALTER TABLE tables ADD COLUMN IF NOT EXISTS x integer NOT NULL DEFAULT 0;
+ALTER TABLE tables ADD COLUMN IF NOT EXISTS y integer NOT NULL DEFAULT 0;
+ALTER TABLE tables ADD COLUMN IF NOT EXISTS w integer NOT NULL DEFAULT 120;
+ALTER TABLE tables ADD COLUMN IF NOT EXISTS h integer NOT NULL DEFAULT 110;
+ALTER TABLE tables DROP CONSTRAINT IF EXISTS tables_shape_check;
+ALTER TABLE tables ADD CONSTRAINT tables_shape_check CHECK (shape IN ('square','round','rect'));
+
 CREATE TABLE IF NOT EXISTS categories (
   id    serial PRIMARY KEY,
   name  text NOT NULL,
@@ -55,6 +64,9 @@ CREATE TABLE IF NOT EXISTS products (
   active       boolean NOT NULL DEFAULT true,
   sort         integer NOT NULL DEFAULT 0
 );
+
+-- Ürün görseli (yüklenen dosyanın yolu: /uploads/products/...)
+ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url text;
 
 -- Boyut/varyant: pizzalarda Küçük/Orta/Büyük, diğerlerinde tek "Standart"
 CREATE TABLE IF NOT EXISTS variants (
