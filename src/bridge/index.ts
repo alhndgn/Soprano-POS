@@ -17,6 +17,8 @@ import path from 'node:path'
 import { buildKot, buildReceipt, trAscii, type KotPayload, type ReceiptPayload } from '../server/print/escpos.ts'
 
 const API = process.env.SOPRANO_API ?? 'http://127.0.0.1:8095'
+const BRIDGE_TOKEN = process.env.BRIDGE_TOKEN
+const authHeaders: Record<string, string> = BRIDGE_TOKEN ? { 'x-bridge-token': BRIDGE_TOKEN } : {}
 const DRY_RUN = process.env.DRY_RUN === '1' || (!process.env.RECEIPT_PRINTER && !process.env.KITCHEN_PRINTER)
 const OUT_DIR = path.join(process.cwd(), 'var', 'prints')
 
@@ -62,7 +64,7 @@ async function previewText(kind: string, payload: any): Promise<string> {
 }
 
 async function tick() {
-  const res = await fetch(`${API}/api/print/jobs`)
+  const res = await fetch(`${API}/api/print/jobs`, { headers: authHeaders })
   if (!res.ok) throw new Error(`API ${res.status}`)
   const jobs = (await res.json()) as Job[]
   for (const job of jobs) {
@@ -81,14 +83,14 @@ async function tick() {
       }
       await fetch(`${API}/api/print/jobs/${job.id}/done`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', ...authHeaders },
         body: JSON.stringify({ ok: true }),
       })
     } catch (err: any) {
       console.error(`[hata] job ${job.id}:`, err.message)
       await fetch(`${API}/api/print/jobs/${job.id}/done`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', ...authHeaders },
         body: JSON.stringify({ ok: false, error: String(err.message).slice(0, 200) }),
       })
     }

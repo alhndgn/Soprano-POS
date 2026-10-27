@@ -71,7 +71,11 @@ async function loadOrder(orderId: number) {
 function sessionToken(req: FastifyRequest): string | undefined {
   const header = req.headers.authorization
   if (header?.startsWith('Bearer ')) return header.slice(7)
-  return (req as any).cookies?.soprano_token
+  const cookieToken = (req as any).cookies?.soprano_token
+  if (cookieToken) return cookieToken
+  // EventSource header gönderemez → token query'den gelir
+  const q = (req.query as any)?.token
+  return typeof q === 'string' && q.length > 0 ? q : undefined
 }
 
 async function authHook(req: FastifyRequest, reply: FastifyReply) {
@@ -566,8 +570,14 @@ export async function registerRoutes(app: FastifyInstance) {
     })
   })
 
-  // ---------- yazıcı köprüsü (token'sız, sadece LAN) ----------
-  app.get('/api/print/jobs', async (req) => {
+  // ---------- yazıcı köprüsü (LAN; BRIDGE_TOKEN verilirse zorunlu) ----------
+  const bridgeGuard = async (req: FastifyRequest, reply: FastifyReply) => {
+    const expected = process.env.BRIDGE_TOKEN
+    if (!expected) return
+    if (req.headers['x-bridge-token'] !== expected) return reply.code(401).send({ error: 'Köprü token hatalı' })
+  }
+
+  app.get('/api/print/jobs', { preHandler: bridgeGuard }, async (req) => {
     const { device } = z.object({ device: z.enum(['receipt', 'kitchen']).optional() }).parse(req.query)
     const rows = await db.all<any>(
       `SELECT id, kind, device, payload FROM print_jobs
@@ -577,7 +587,7 @@ export async function registerRoutes(app: FastifyInstance) {
     return rows
   })
 
-  app.post('/api/print/jobs/:id/done', async (req) => {
+  app.post('/api/print/jobs/:id/done', { preHandler: bridgeGuard }, async (req) => {
     const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
     const { ok, error } = z.object({ ok: z.boolean(), error: z.string().optional() }).parse(req.body)
     await db.one(`UPDATE print_jobs SET status=$1, error=$2 WHERE id=$3 RETURNING id`, [ok ? 'printed' : 'failed', error ?? null, id])

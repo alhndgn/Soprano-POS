@@ -40,7 +40,7 @@ Paket servis, kurye takibi, QR/online sipariş, Yemeksepeti–Trendyol Go, ÖKC/
 |---|---|---|
 | Lisans | Kendi kodumuz (MIT) | Müşteriye kurulacak ve satılacak; AGPL projeler (URY) bu yüzden elendi |
 | Backend | Node 22+ / Fastify 5 / TypeScript | Tek süreç, düşük kaynak, Windows laptopta bile çalışır |
-| Veritabanı | PGlite (gömülü Postgres), `DATABASE_URL` ile gerçek Postgres’e geçiş | Kurulumda Docker/psql derdi yok; SQL Postgres |
+| Veritabanı | PGlite (gömülü Postgres); gerçek Postgres adaptörü v0.2’de (`DATABASE_URL`) | Kurulumda Docker/psql derdi yok; SQL Postgres |
 | Arayüz | React + Vite, PWA | Tablet tarayıcıda uygulama gibi; APK/app store yok |
 | Para | Kuruş (integer), KDV dahil fiyat | Float yuvarlama hatası yok |
 | Kimlik | Personel PIN’i (scrypt) + oturum token’ı | Tablette 3 saniyede giriş |
@@ -121,3 +121,4 @@ Yetki sunucuda uygulanır (`requireRole`); arayüz sadece gizler.
 3. **PGlite tek süreç** — 1 şube için yeterli; 5+ terminalde gerçek Postgres’e geçilmeli.
 4. **Yedekleme** — `var/pgdata` klasörü; gecelik kopyalama henüz otomatik değil (MVP).
 5. **Masa birleştirme** ve paket servis yok — sözleşmede v2.
+6. **Yazıcı köprüsü uçları** LAN’da açık; `BRIDGE_TOKEN` verilmezse fiş kuyruğunu ağdaki herkes okuyabilir. Sahada token verilmeli.
