@@ -1,0 +1,10 @@
+{
+  "name": "Soprano POS",
+  "short_name": "Soprano",
+  "start_url": "/tables",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0b0e13",
+  "theme_color": "#0b0e13",
+  "lang": "tr"
+}

@@ -1,0 +1,170 @@
+// ---------- tipler ----------
+export type Role = 'waiter' | 'cashier' | 'manager'
+export type Me = { id: number; name: string; role: Role }
+
+export type Variant = { id: number; product_id: number; name: string; price: number }
+export type Modifier = { id: number; group_id: number; name: string; price: number }
+export type ModGroup = { id: number; name: string; min: number; max: number; modifiers: Modifier[] }
+export type Product = {
+  id: number
+  name: string
+  vatRate: number
+  variants: Variant[]
+  groups: ModGroup[]
+}
+export type Category = { id: number; name: string; emoji: string; products: Product[] }
+export type OpenOrder = {
+  id: number
+  table_id: number
+  guest_count: number
+  opened_at: string
+  total: number
+  sent_lines: number
+  line_count: number
+}
+export type Table = { id: number; floor_id: number; name: string; seats: number; order: OpenOrder | null }
+export type Floor = { id: number; name: string; tables: Table[] }
+export type Shift = { id: number; opened_at: string; opening_float: number } | null
+
+export type Bootstrap = {
+  me: Me
+  outlet: { name?: string; footer?: string; address?: string; phone?: string }
+  shift: Shift
+  floors: Floor[]
+  menu: Category[]
+}
+
+export type LineMod = { id?: number; name: string; price: number }
+export type OrderLine = {
+  id: number
+  order_id: number
+  name: string
+  qty: number
+  unit_price: number
+  vat_rate: number
+  note: string | null
+  status: 'new' | 'sent' | 'preparing' | 'ready' | 'served' | 'void'
+  modifiers: LineMod[]
+}
+export type Totals = { subtotal: number; vat: number; total: number; vatLines: { rate: number; net: number; vat: number; gross: number }[] }
+export type Order = {
+  id: number
+  table_id: number | null
+  table_name: string | null
+  staff_name: string
+  status: 'open' | 'paid' | 'void'
+  guest_count: number
+  note: string | null
+  opened_at: string
+  closed_at: string | null
+  lines: OrderLine[]
+  payments: { id: number; method: string; amount: number }[]
+  totals: Totals
+  paid: number
+}
+
+export type KdsLine = {
+  id: number
+  order_id: number
+  name: string
+  qty: number
+  note: string | null
+  status: 'sent' | 'preparing' | 'ready'
+  sent_at: string
+  table_name: string | null
+  modifiers: { name: string }[]
+}
+
+// ---------- istemci ----------
+const TOKEN_KEY = 'soprano_token'
+
+export const auth = {
+  get: () => localStorage.getItem(TOKEN_KEY),
+  set: (t: string) => localStorage.setItem(TOKEN_KEY, t),
+  clear: () => localStorage.removeItem(TOKEN_KEY),
+}
+
+export class ApiError extends Error {
+  status: number
+  constructor(message: string, status: number) {
+    super(message)
+    this.status = status
+  }
+}
+
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const token = auth.get()
+  const res = await fetch(path, {
+    method,
+    headers: {
+      'content-type': 'application/json',
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  const text = await res.text()
+  const data = text ? JSON.parse(text) : {}
+  if (!res.ok) {
+    if (res.status === 401 && !path.includes('/auth/pin')) auth.clear()
+    throw new ApiError(data.error ?? `Hata ${res.status}`, res.status)
+  }
+  return data as T
+}
+
+export const api = {
+  login: (pin: string) => request<{ user: Me; token: string }>('POST', '/api/auth/pin', { pin }),
+  logout: () => request('POST', '/api/auth/logout', {}),
+  bootstrap: () => request<Bootstrap>('GET', '/api/bootstrap'),
+  openShift: (openingFloat = 0) => request('POST', '/api/shift/open', { openingFloat }),
+  closeShift: (closingCount: number) => request('POST', '/api/shift/close', { closingCount }),
+  createOrder: (tableId: number, guestCount = 1) => request<{ id: number }>('POST', '/api/orders', { tableId, guestCount }),
+  order: (id: number) => request<Order>('GET', `/api/orders/${id}`),
+  addLine: (
+    orderId: number,
+    body: { productId: number; variantId: number | null; qty: number; modifierIds: number[]; note?: string },
+  ) => request<Order>('POST', `/api/orders/${orderId}/lines`, body),
+  patchLine: (lineId: number, body: { qty?: number; note?: string | null; void?: boolean }) =>
+    request<Order>('PATCH', `/api/orders/lines/${lineId}`, body),
+  send: (orderId: number) => request<Order>('POST', `/api/orders/${orderId}/send`, {}),
+  move: (orderId: number, tableId: number) => request<Order>('POST', `/api/orders/${orderId}/move`, { tableId }),
+  pay: (orderId: number, payments: { method: 'cash' | 'card' | 'other'; amount: number }[]) =>
+    request<{ ok: boolean; change: number }>('POST', `/api/orders/${orderId}/pay`, { payments }),
+  kds: () => request<{ lines: KdsLine[] }>('GET', '/api/kds'),
+  kdsStatus: (lineId: number, status: 'preparing' | 'ready' | 'served') =>
+    request('POST', `/api/kds/lines/${lineId}/status`, { status }),
+  report: (date?: string) =>
+    request<{
+      day: string
+      revenue: number
+      orders: number
+      byMethod: { method: string; amount: number; count: number }[]
+      topProducts: { name: string; qty: number; revenue: number }[]
+      hourly: { hour: number; amount: number }[]
+    }>('GET', `/api/reports/daily${date ? `?date=${date}` : ''}`),
+  adminMenu: () =>
+    request<{ id: number; name: string; vat_rate: number; category: string; category_id: number; variants: Variant[] }[]>(
+      'GET',
+      '/api/admin/menu',
+    ),
+  staff: () => request<{ id: number; name: string; role: Role; active: boolean }[]>('GET', '/api/admin/staff'),
+  addStaff: (body: { name: string; role: Role; pin: string }) =>
+    request('POST', '/api/admin/staff', body),
+}
+
+// ---------- biçimlendirme ----------
+const tryFmt = new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+export function money(kurus: number): string {
+  return `${tryFmt.format(kurus / 100)} ₺`
+}
+
+export function elapsed(iso: string): string {
+  const mins = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000))
+  if (mins < 60) return `${mins} dk`
+  return `${Math.floor(mins / 60)} sa ${mins % 60} dk`
+}
+
+export function lineTotal(l: OrderLine): number {
+  const mods = l.modifiers.reduce((s, m) => s + m.price, 0)
+  return (l.unit_price + mods) * l.qty
+}

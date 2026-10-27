@@ -1,0 +1,52 @@
+# Soprano POS — Uygulama Planı
+
+**Tarih:** 2026-10-27 · **Durum:** Faz 1–3 tamam, Faz 4 kısmi
+
+## Faz 0 — Keşif ve ortam (tamam)
+- [x] Piyasa taraması: URY, BeepBite, Odoo, SambaPOS, Floreant karşılaştırması
+- [x] Lisans kararı: kendi kod (MIT), AGPL fork yok
+- [x] Ortam: Node 26, npm 11; Docker/psql yok → PGlite
+
+## Faz 1 — İskelet + menü + masa (tamam)
+- [x] Proje iskeleti (Vite + React + Fastify + TS)
+- [x] Şema (`schema.sql`) + tohum verisi (18 ürün, 3 modifier grubu, 9 masa, 3 personel)
+- [x] PIN girişi (scrypt) + oturum + rol kontrolü
+- [x] `GET /api/bootstrap` (masa, menü, vardiya tek çağrıda)
+- [x] Masa ekranı + açık adisyon rayı
+
+## Faz 2 — Adisyon + modifier + KOT (tamam)
+- [x] Adisyon aç/taşı, satır ekle, adet, iptal
+- [x] Boy + modifier + not seçimi (bottom sheet)
+- [x] Mutfağa gönder → satır durumu `sent`, KOT işi kuyruğa
+- [x] KDS üç kolon + durum geçişleri
+- [x] ESC/POS fiş ve KOT üretimi, yazıcı köprüsü (dry-run + ağ yazıcı)
+
+## Faz 3 — Ödeme, kasa, rapor (tamam)
+- [x] Parçalı ödeme, para üstü, tahsilat sınırlaması (ciro tutarlılığı)
+- [x] Vardiya aç/kapa + açık adisyon koruması
+- [x] Günlük rapor (ciro, adet, ortalama, ödeme dağılımı, saatlik, top ürünler)
+- [x] Menü/personel yönetimi ekranı
+- [x] 11 birim testi + 27 uçtan uca API doğrulaması
+- [x] Gerçek tarayıcıda uçtan uca akış + ekran görüntüleri
+
+## Faz 4 — Cila (kısmi)
+- [x] SSE ile canlı yenileme, 15 sn yedek
+- [x] Tablet için responsive düzen, koyu tema
+- [ ] PWA ikonları + service worker (çevrimdışı kabuk)
+- [ ] Masa birleştirme, yarım-yarım pizza UI’ı
+- [ ] Gecelik otomatik yedek
+
+## Sonraki sürüm (v0.2)
+1. **Paket servis**: müşteri/adres defteri, bölge, kurye ataması, teslim durumu
+2. **QR menü / online sipariş**: mevcut WordPress kurulumuna bağlanır
+3. **ÖKC entegrasyonu**: `FiscalProvider` implementasyonu (Ingenico/Beko/Verifone SDK)
+4. **e-Arşiv/e-Fatura**: entegratör API’si (Paraşüt/Uyumsoft/Logo)
+5. **Mikro aktarımı**: gün sonu satış/fatura aktarım dosyası
+6. **Stok & reçete**: hamur/peynir fire, maliyet, günlük P&L
+
+## Kabul kriterleri (v1)
+- Garson PIN → masa → ürün → gönder: ≤ 4 dokunuş ✓
+- KOT 2 sn içinde kuyrukta ✓ (ölçüldü: anında)
+- Kasa: ödeme toplamı = ciro, para üstü ciroya yazılmaz ✓ (test)
+- KDV dilimleri doğru, kuruş kaybı yok ✓ (test)
+- İnternet kesintisinde LAN çalışır ✓ (mimari gereği; saha testi bekliyor)

@@ -1,0 +1,532 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { useApp } from '../App.tsx'
+import { api, elapsed, lineTotal, money, type Order, type OrderLine, type Product } from '../api.ts'
+
+type SheetState = {
+  product: Product
+  variantId: number | null
+  qty: number
+  mods: number[]
+  note: string
+}
+
+const MAX_QTY = 20
+
+export default function OrderPage() {
+  const { id } = useParams()
+  const orderId = Number(id)
+  const { boot, me, refresh } = useApp()
+  const navigate = useNavigate()
+
+  const [order, setOrder] = useState<Order | null>(null)
+  const [catId, setCatId] = useState<number | null>(null)
+  const [sheet, setSheet] = useState<SheetState | null>(null)
+  const [payOpen, setPayOpen] = useState(false)
+  const [moveOpen, setMoveOpen] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const load = useCallback(async () => {
+    try {
+      const o = await api.order(orderId)
+      setOrder(o)
+      setError(null)
+    } catch (e: any) {
+      setError(e.message)
+    }
+  }, [orderId])
+
+  useEffect(() => {
+    void load()
+    const t = setInterval(() => void load(), 6000)
+    return () => clearInterval(t)
+  }, [load])
+
+  const menu = boot?.menu ?? []
+  const activeCat = menu.find((c) => c.id === catId) ?? menu[0]
+
+  const totals = order?.totals
+  const canPay = me?.role === 'cashier' || me?.role === 'manager'
+  const canVoid = me?.role === 'manager'
+
+  const doAction = async (fn: () => Promise<Order>) => {
+    setBusy(true)
+    try {
+      const o = await fn()
+      setOrder(o)
+      setError(null)
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const pickProduct = (p: Product) => {
+    const needVariant = p.variants.length > 1
+    if (!needVariant && p.groups.length === 0) {
+      void doAction(() =>
+        api.addLine(orderId, { productId: p.id, variantId: p.variants[0]?.id ?? null, qty: 1, modifierIds: [] }),
+      )
+      return
+    }
+    setSheet({
+      product: p,
+      variantId: p.variants.length === 1 ? p.variants[0].id : null,
+      qty: 1,
+      mods: [],
+      note: '',
+    })
+  }
+
+  const sheetPrice = useMemo(() => {
+    if (!sheet) return 0
+    const v = sheet.product.variants.find((x) => x.id === sheet.variantId)
+    const mods = sheet.product.groups.flatMap((g) => g.modifiers).filter((m) => sheet.mods.includes(m.id))
+    return ((v?.price ?? 0) + mods.reduce((s, m) => s + m.price, 0)) * sheet.qty
+  }, [sheet])
+
+  const sheetValid = useMemo(() => {
+    if (!sheet) return false
+    if (sheet.product.variants.length > 1 && !sheet.variantId) return false
+    return sheet.product.groups.every((g) => {
+      const count = g.modifiers.filter((m) => sheet.mods.includes(m.id)).length
+      return count >= g.min && count <= g.max
+    })
+  }, [sheet])
+
+  const addFromSheet = async () => {
+    if (!sheet) return
+    await doAction(() =>
+      api.addLine(orderId, {
+        productId: sheet.product.id,
+        variantId: sheet.variantId,
+        qty: sheet.qty,
+        modifierIds: sheet.mods,
+        note: sheet.note.trim() || undefined,
+      }),
+    )
+    setSheet(null)
+  }
+
+  if (!order) {
+    return (
+      <div className="page">
+        <div className="page-head">
+          <div>
+            <h1>Adisyon</h1>
+            <div className="sub">{error ?? 'Yükleniyor…'}</div>
+          </div>
+          <button className="btn ghost" onClick={() => navigate('/tables')}>
+            ← Masalar
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="order-layout">
+      <div className="cat-rail">
+        {menu.map((c) => (
+          <button key={c.id} className={`cat-btn${c.id === activeCat?.id ? ' on' : ''}`} onClick={() => setCatId(c.id)}>
+            <span>{c.emoji}</span>
+            {c.name}
+          </button>
+        ))}
+      </div>
+
+      <div className="product-panel">
+        <div className="product-head">
+          <div>
+            <h2>{activeCat?.name}</h2>
+            <div className="sub" style={{ color: 'var(--muted)', fontSize: 12.5, marginTop: 4 }}>
+              {order.table_name ?? 'Masa'} · {order.guest_count} kişi · {elapsed(order.opened_at)}
+            </div>
+          </div>
+          <button className="btn ghost sm" onClick={() => navigate('/tables')}>
+            ← Masalar
+          </button>
+        </div>
+
+        <div className="product-grid">
+          {(activeCat?.products ?? []).map((p) => {
+            const min = Math.min(...p.variants.map((v) => v.price))
+            return (
+              <button key={p.id} className="product-card" onClick={() => pickProduct(p)} disabled={busy}>
+                <div className="product-name">{p.name}</div>
+                <div className="product-hint">
+                  {p.variants.length > 1 ? `${p.variants.length} boy` : p.variants[0]?.name}
+                  {p.groups.length ? ` · ${p.groups.length} seçenek` : ''}
+                </div>
+                <div className="product-price">{money(min)}</div>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="cart">
+        <div className="cart-head">
+          <div>
+            <h2>Adisyon #{order.id}</h2>
+            <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 3 }}>
+              {order.staff_name} · {order.lines.length} satır
+              {order.lines.some((l) => l.status === 'new')
+                ? ` · ${order.lines.filter((l) => l.status === 'new').length} yeni`
+                : ''}
+            </div>
+          </div>
+          <span className="pill">{order.guest_count} kişi</span>
+        </div>
+
+        <div className="cart-lines">
+          {order.lines.length === 0 && (
+            <div className="empty-cart">
+              <span>🍕</span>
+              Ürün seçmek için soldaki menüye dokun
+            </div>
+          )}
+          {order.lines.map((l) => (
+            <CartLine
+              key={l.id}
+              line={l}
+              canVoid={canVoid}
+              onQty={(qty) => void doAction(() => api.patchLine(l.id, { qty }))}
+              onVoid={() => {
+                if (!confirm(`${l.name} iptal edilsin mi?`)) return
+                void doAction(() => api.patchLine(l.id, { void: true }))
+              }}
+            />
+          ))}
+        </div>
+
+        <div className="cart-foot">
+          {error && <div style={{ color: 'var(--danger)', fontSize: 12.5, marginBottom: 8 }}>{error}</div>}
+          <div className="totals-row">
+            <span>Ara toplam (KDV hariç)</span>
+            <b>{money(totals?.subtotal ?? 0)}</b>
+          </div>
+          {(totals?.vatLines ?? []).map((v) => (
+            <div className="totals-row" key={v.rate}>
+              <span>KDV %{v.rate}</span>
+              <b>{money(v.vat)}</b>
+            </div>
+          ))}
+          <div className="totals-total">
+            <span>Toplam</span>
+            <b>{money(totals?.total ?? 0)}</b>
+          </div>
+          <div className="cart-actions">
+            <button
+              className="btn"
+              disabled={busy || !order.lines.some((l) => l.status === 'new')}
+              onClick={() => void doAction(() => api.send(orderId))}
+            >
+              Mutfağa Gönder
+            </button>
+            <button className="btn primary" disabled={!canPay || order.lines.length === 0} onClick={() => setPayOpen(true)}>
+              Ödeme Al
+            </button>
+          </div>
+          <button className="btn ghost sm block" style={{ marginTop: 9 }} onClick={() => setMoveOpen(true)}>
+            Masa Taşı
+          </button>
+        </div>
+      </div>
+
+      {sheet && (
+        <div className="sheet-backdrop" onClick={(e) => e.target === e.currentTarget && setSheet(null)}>
+          <div className="sheet">
+            <div className="sheet-head">
+              <div>
+                <h3>{sheet.product.name}</h3>
+                <p>
+                  {sheet.product.variants.length > 1 ? 'Boy seç' : sheet.product.variants[0]?.name}
+                  {sheet.product.groups.length ? ' · seçenekleri işaretle' : ''}
+                </p>
+              </div>
+              <button className="btn ghost sm" onClick={() => setSheet(null)}>
+                Kapat
+              </button>
+            </div>
+
+            {sheet.product.variants.length > 1 && (
+              <div className="mod-group">
+                <div className="mod-group-head">
+                  <span>Boyut</span>
+                  <span>zorunlu</span>
+                </div>
+                <div className="mod-chips">
+                  {sheet.product.variants.map((v) => (
+                    <button
+                      key={v.id}
+                      className={`chip${sheet.variantId === v.id ? ' on' : ''}`}
+                      onClick={() => setSheet({ ...sheet, variantId: v.id })}
+                    >
+                      {v.name}
+                      <small>{money(v.price)}</small>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {sheet.product.groups.map((g) => (
+              <div className="mod-group" key={g.id}>
+                <div className="mod-group-head">
+                  <span>{g.name}</span>
+                  <span>
+                    {g.min > 0 ? `en az ${g.min}` : 'opsiyonel'} · en çok {g.max}
+                  </span>
+                </div>
+                <div className="mod-chips">
+                  {g.modifiers.map((m) => {
+                    const on = sheet.mods.includes(m.id)
+                    const toggle = () => {
+                      const next = on ? sheet.mods.filter((x) => x !== m.id) : [...sheet.mods, m.id]
+                      setSheet({ ...sheet, mods: next })
+                    }
+                    return (
+                      <button key={m.id} className={`chip${on ? ' on' : ''}`} onClick={toggle}>
+                        {m.name}
+                        {m.price > 0 && <small>+{money(m.price)}</small>}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+
+            <div className="mod-group">
+              <div className="mod-group-head">
+                <span>Not</span>
+                <span>mutfağa gider</span>
+              </div>
+              <textarea
+                className="textarea"
+                placeholder="Örn: iyi pişsin, soğan olmasın…"
+                value={sheet.note}
+                onChange={(e) => setSheet({ ...sheet, note: e.target.value })}
+              />
+            </div>
+
+            <div className="sheet-foot">
+              <div className="qty stepper">
+                <button onClick={() => setSheet({ ...sheet, qty: Math.max(1, sheet.qty - 1) })}>−</button>
+                <b>{sheet.qty}</b>
+                <button onClick={() => setSheet({ ...sheet, qty: Math.min(MAX_QTY, sheet.qty + 1) })}>+</button>
+              </div>
+              <div className="grow" style={{ textAlign: 'right', fontWeight: 700, fontSize: 18 }}>{money(sheetPrice)}</div>
+              <button className="btn primary" disabled={!sheetValid || busy} onClick={() => void addFromSheet()}>
+                Ekle
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {payOpen && order && (
+        <PaymentModal
+          total={order.totals.total}
+          onClose={() => setPayOpen(false)}
+          onDone={async (payments) => {
+            try {
+              const r = await api.pay(orderId, payments)
+              await refresh()
+              setPayOpen(false)
+              if (r.change > 0) alert(`Para üstü: ${money(r.change)}`)
+              navigate('/tables')
+            } catch (e: any) {
+              setError(e.message)
+            }
+          }}
+        />
+      )}
+
+      {moveOpen && (
+        <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && setMoveOpen(false)}>
+          <div className="modal">
+            <h3>Masa Taşı</h3>
+            <div className="sub">Adisyonu taşımak istediğin masayı seç</div>
+            <div className="mod-chips">
+              {(boot?.floors ?? []).flatMap((f) =>
+                f.tables
+                  .filter((t) => t.id !== order.table_id && !t.order)
+                  .map((t) => (
+                    <button
+                      key={t.id}
+                      className="chip"
+                      onClick={async () => {
+                        await doAction(() => api.move(orderId, t.id))
+                        setMoveOpen(false)
+                      }}
+                    >
+                      {t.name}
+                    </button>
+                  )),
+              )}
+            </div>
+            <div className="modal-actions">
+              <button className="btn" onClick={() => setMoveOpen(false)}>
+                Vazgeç
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CartLine({
+  line,
+  canVoid,
+  onQty,
+  onVoid,
+}: {
+  line: OrderLine
+  canVoid: boolean
+  onQty: (qty: number) => void
+  onVoid: () => void
+}) {
+  const voided = line.status === 'void'
+  return (
+    <div className={`cart-line${voided ? ' voided' : ''}`}>
+      <div className="line-top">
+        <div>
+          <div className="line-name">{line.name}</div>
+          {line.modifiers.length > 0 && (
+            <div className="line-mods">{line.modifiers.map((m) => m.name).join(' · ')}</div>
+          )}
+          {line.note && <div className="line-note">“{line.note}”</div>}
+        </div>
+        <div className="line-price">{money(lineTotal(line))}</div>
+      </div>
+      <div className="line-bottom">
+        <div className="stepper">
+          <button onClick={() => onQty(Math.max(1, line.qty - 1))}>−</button>
+          <b>{line.qty}</b>
+          <button onClick={() => onQty(Math.min(MAX_QTY, line.qty + 1))}>+</button>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span className={`pill${line.status === 'new' ? '' : line.status === 'served' ? ' ok' : ' warn'}`}>
+            {line.status === 'new'
+              ? 'yeni'
+              : line.status === 'sent'
+                ? 'mutfakta'
+                : line.status === 'preparing'
+                  ? 'hazırlanıyor'
+                  : line.status === 'ready'
+                    ? 'hazır'
+                    : 'servis'}
+          </span>
+          {canVoid && !voided && (
+            <button className="btn ghost sm" style={{ color: 'var(--danger)' }} onClick={onVoid}>
+              İptal
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PaymentModal({
+  total,
+  onClose,
+  onDone,
+}: {
+  total: number
+  onClose: () => void
+  onDone: (payments: { method: 'cash' | 'card' | 'other'; amount: number }[]) => void
+}) {
+  const [method, setMethod] = useState<'cash' | 'card'>('cash')
+  const [amount, setAmount] = useState('')
+  const [payments, setPayments] = useState<{ method: 'cash' | 'card' | 'other'; amount: number }[]>([])
+
+  const paid = payments.reduce((s, p) => s + p.amount, 0)
+  const remain = Math.max(0, total - paid)
+  const parsed = Math.round(Number(amount.replace(',', '.')) * 100) || 0
+  // Kutu boşsa kalanın tamamı ödeniyor sayılır (hızlı tek tuş akışı)
+  const pendingAmount = parsed > 0 ? parsed : payments.length ? 0 : remain
+  const willPay = paid + pendingAmount
+  const isPartial = parsed > 0 && parsed < remain
+  const quick = [total, Math.ceil(total / 10000) * 10000, Math.ceil(total / 5000) * 5000, Math.ceil(total / 10000) * 20000]
+    .filter((v, i, arr) => v >= remain && arr.indexOf(v) === i)
+    .slice(0, 4)
+
+  const add = () => {
+    if (parsed <= 0) return
+    setPayments([...payments, { method, amount: parsed }])
+    setAmount('')
+  }
+
+  const complete = () => {
+    const final = [...payments]
+    if (pendingAmount > 0) final.push({ method, amount: pendingAmount })
+    if (final.reduce((s, p) => s + p.amount, 0) >= total) onDone(final)
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <h3>Ödeme</h3>
+        <div className="sub">Kalan: {money(remain)}</div>
+        <div className="pay-amount">{money(remain)}</div>
+
+        <div className="pay-methods">
+          <button className={`pay-method${method === 'cash' ? ' on' : ''}`} onClick={() => setMethod('cash')}>
+            Nakit
+          </button>
+          <button className={`pay-method${method === 'card' ? ' on' : ''}`} onClick={() => setMethod('card')}>
+            Kredi Kartı
+          </button>
+        </div>
+
+        <div className="quick-amounts">
+          {quick.map((q) => (
+            <button key={q} className="chip" onClick={() => setAmount((q / 100).toFixed(2))}>
+              {money(q)}
+            </button>
+          ))}
+        </div>
+
+        <input
+          className="input"
+          inputMode="decimal"
+          placeholder="Tutar (₺)"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && add()}
+        />
+
+        {payments.length > 0 && (
+          <div className="pay-rows" style={{ marginTop: 12 }}>
+            {payments.map((p, i) => (
+              <div className="pay-row" key={i}>
+                <span>{p.method === 'cash' ? 'Nakit' : 'Kart'}</span>
+                <b>{money(p.amount)}</b>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="pay-summary">
+          <span>Ödenen</span>
+          <b>{money(paid)}</b>
+        </div>
+
+        <div className="modal-actions">
+          <button className="btn" onClick={isPartial ? add : onClose}>
+            {isPartial ? 'Parçalı Ekle' : 'Vazgeç'}
+          </button>
+          <button className="btn primary" disabled={willPay < total} onClick={complete}>
+            {willPay >= total ? 'Adisyonu Kapat' : 'Tutar Yetersiz'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
