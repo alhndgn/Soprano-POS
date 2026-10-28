@@ -19,12 +19,15 @@ OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
 
 
 def background():
-    img = Image.new("RGB", (W, H), "#0f141b")
+    # açık, sıcak zemin: beyaz kartların üstünde doğal dursun
+    img = Image.new("RGB", (W, H), "#fffdfb")
     d = ImageDraw.Draw(img)
     for y in range(H):
         t = y / H
-        d.line([(0, y), (W, y)], fill=(int(22 - 8 * t), int(28 - 10 * t), int(37 - 12 * t)))
-    return img
+        d.line([(0, y), (W, y)], fill=(int(255 - 6 * t), int(250 - 10 * t), int(245 - 12 * t)))
+    d.ellipse((-120, -160, 320, 220), fill=(255, 240, 236))
+    d.ellipse((W - 240, H - 200, W + 120, H + 80), fill=(255, 246, 232))
+    return img.filter(ImageFilter.GaussianBlur(18))
 
 
 def jitter(color, amount=10, rnd=random):
@@ -36,7 +39,7 @@ def jitter(color, amount=10, rnd=random):
 
 def drop_shadow(img, box, blur=18):
     layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    ImageDraw.Draw(layer).ellipse(box, fill=(0, 0, 0, 150))
+    ImageDraw.Draw(layer).ellipse(box, fill=(90, 62, 45, 55))
     return Image.alpha_composite(img.convert("RGBA"), layer.filter(ImageFilter.GaussianBlur(blur))).convert("RGB")
 
 
@@ -110,10 +113,10 @@ def drink(color, garnish=None, glass_h=250):
     img = drop_shadow(img, (cx - 90, top + glass_h - 24, cx + 90, top + glass_h + 30), blur=16)
     d = ImageDraw.Draw(img)
     wtop, wbot = 96, 78
-    d.polygon([(cx - wtop, top), (cx + wtop, top), (cx + wbot, top + glass_h), (cx - wbot, top + glass_h)], fill=(48, 56, 66))
+    d.polygon([(cx - wtop, top), (cx + wtop, top), (cx + wbot, top + glass_h - 6), (cx - wbot, top + glass_h - 6)], fill=(226, 232, 239))
     d.polygon([(cx - wtop + 10, top + 26), (cx + wtop - 10, top + 26), (cx + wbot - 12, top + glass_h - 8), (cx - wbot + 12, top + glass_h - 8)], fill=color)
     d.polygon([(cx - wtop + 10, top + 26), (cx - wtop + 40, top + 26), (cx - wbot + 40, top + glass_h - 8), (cx - wbot + 12, top + glass_h - 8)], fill=(255, 255, 255, 40))
-    d.ellipse((cx - wtop, top - 12, cx + wtop, top + 16), fill=(70, 80, 92))
+    d.ellipse((cx - wtop, top - 12, cx + wtop, top + 16), fill=(240, 244, 248), outline=(205, 212, 222), width=3)
     if garnish:
         d.rounded_rectangle((cx + 26, top - 46, cx + 36, top + 10), radius=5, fill="#d94f4f")
         d.ellipse((cx - 26, top - 26, cx + 12, top + 8), fill=garnish)
@@ -126,8 +129,8 @@ def starter(kind, rnd):
     cx, cy = W // 2, H // 2
     img = drop_shadow(img, (cx - 158, cy + 40, cx + 158, cy + 120))
     d = ImageDraw.Draw(img)
-    d.ellipse((cx - 168, cy - 120, cx + 168, cy + 116), fill="#e9e4da")
-    d.ellipse((cx - 148, cy - 104, cx + 148, cy + 100), fill="#f5f1e9")
+    d.ellipse((cx - 168, cy - 120, cx + 168, cy + 116), fill="#f0e7dd", outline="#e2d6c8", width=3)
+    d.ellipse((cx - 148, cy - 104, cx + 148, cy + 100), fill="#fffdf9")
 
     if kind == "garlic":
         for i, x in enumerate((-78, 0, 78)):
@@ -165,7 +168,7 @@ def dessert(kind, rnd):
     cx, cy = W // 2, H // 2
     img = drop_shadow(img, (cx - 130, cy + 40, cx + 130, cy + 110), blur=16)
     d = ImageDraw.Draw(img)
-    d.ellipse((cx - 150, cy - 96, cx + 150, cy + 104), fill="#f2ece2")
+    d.ellipse((cx - 150, cy - 96, cx + 150, cy + 104), fill="#fffdf9", outline="#eadfd2", width=3)
 
     if kind == "tiramisu":
         d.rounded_rectangle((cx - 92, cy - 58, cx + 92, cy + 58), radius=12, fill="#e8dcc4")

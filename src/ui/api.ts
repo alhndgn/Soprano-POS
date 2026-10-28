@@ -153,6 +153,7 @@ export const api = {
   patchLine: (lineId: number, body: { qty?: number; note?: string | null; void?: boolean }) =>
     request<Order>('PATCH', `/api/orders/lines/${lineId}`, body),
   send: (orderId: number) => request<Order>('POST', `/api/orders/${orderId}/send`, {}),
+  voidOrder: (orderId: number) => request<{ ok: boolean }>('POST', `/api/orders/${orderId}/void`, {}),
   move: (orderId: number, tableId: number) => request<Order>('POST', `/api/orders/${orderId}/move`, { tableId }),
   pay: (orderId: number, payments: { method: 'cash' | 'card' | 'other'; amount: number }[]) =>
     request<{ ok: boolean; change: number }>('POST', `/api/orders/${orderId}/pay`, { payments }),

@@ -399,6 +399,32 @@ export async function registerRoutes(app: FastifyInstance) {
       return loadOrder(id)
     })
 
+    // Yanlış açılan adisyonu iptal et (yönetici, ödeme alınmamışsa)
+    scope.post('/api/orders/:id/void', async (req) => {
+      requireRole(user(req), ['manager'])
+      const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
+      const order = await db.one<any>(`SELECT * FROM orders WHERE id=$1`, [id])
+      if (!order) {
+        const e: any = new Error('Adisyon bulunamadı')
+        e.statusCode = 404
+        throw e
+      }
+      if (order.status !== 'open') {
+        const e: any = new Error('Adisyon açık değil')
+        e.statusCode = 400
+        throw e
+      }
+      const paid = await db.one<{ c: number }>(`SELECT count(*)::int AS c FROM payments WHERE order_id=$1`, [id])
+      if (paid && paid.c > 0) {
+        const e: any = new Error('Ödeme alınmış adisyon iptal edilemez')
+        e.statusCode = 400
+        throw e
+      }
+      await db.one(`UPDATE orders SET status='void', closed_at=now() WHERE id=$1 RETURNING id`, [id])
+      broadcast()
+      return { ok: true, orderId: id }
+    })
+
     scope.post('/api/orders/:id/pay', async (req) => {
       requireRole(user(req), ['cashier', 'manager'])
       const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)

@@ -185,7 +185,27 @@ export default function OrderPage() {
                 : ''}
             </div>
           </div>
-          <span className="pill">{order.guest_count} kişi</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {canVoid && (
+              <button
+                className="btn ghost sm"
+                style={{ color: 'var(--danger)', fontSize: 11.5, padding: '5px 9px' }}
+                onClick={async () => {
+                  if (!confirm('Adisyon iptal edilsin mi? (ödeme alınmadıysa)')) return
+                  try {
+                    await api.voidOrder(orderId)
+                    await refresh()
+                    navigate('/tables')
+                  } catch (e: any) {
+                    setError(e.message)
+                  }
+                }}
+              >
+                Adisyonu iptal
+              </button>
+            )}
+            <span className="pill">{order.guest_count} kişi</span>
+          </div>
         </div>
 
         <div className="cart-lines">

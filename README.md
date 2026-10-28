@@ -11,6 +11,8 @@ Pizzacı için masa/adisyon, mutfak ekranı ve kasa yönetimi. Tek sunucu, table
 - **Mutfak ekranı:** Yeni → Hazırlanıyor → Hazır, canlı güncelleme
 - **Kasa:** parçalı ödeme, para üstü, vardiya aç/kapa, günlük rapor
 - **Menü görselleri:** ürün fotoğrafı yükle, sipariş kartlarında görünsün
+- **Açık tema:** beyaz zemin + kırmızı vurgu, tablette yüksek kontrast
+- **Adisyon iptali:** yanlış açılan adisyonu yönetici iptal eder
 
 ## Hızlı başlangıç
 

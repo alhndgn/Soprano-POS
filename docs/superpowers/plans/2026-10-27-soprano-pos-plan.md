@@ -46,6 +46,14 @@
 - [x] `scripts/e2e_layout.py`: 16 doğrulama (CRUD, kalıcılık, sınır, silme korumaları)
 - [x] Tarayıcıda sürükle-bırak testi (pointer olaylarıyla) ve kayıt doğrulaması
 
+## Faz 6 — Açık tema + adisyon iptali (tamam)
+- [x] Tasarım sistemi v2: beyaz zemin, kırmızı vurgu, kontrastlı ikincil metin, gölge/kenarlık disiplini
+- [x] Demo yemek görselleri açık zemine göre yeniden üretildi (18 ürün)
+- [x] `POST /api/orders/:id/void` — yönetici, ödeme alınmamış adisyonu iptal eder
+- [x] Sipariş ekranında “Adisyonu iptal” butonu (yalnızca yönetici)
+- [x] `scripts/reset_demo.py` — demo verisini tazeler (iptal + yeni vardiya + 3 dolu masa)
+- [x] Ekran görüntüleri yeni temayla güncellendi, görsel inceleme yapıldı
+
 ## Sonraki sürüm (v0.2)
 1. **Paket servis**: müşteri/adres defteri, bölge, kurye ataması, teslim durumu
 2. **QR menü / online sipariş**: mevcut WordPress kurulumuna bağlanır

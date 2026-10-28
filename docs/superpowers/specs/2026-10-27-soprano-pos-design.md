@@ -116,6 +116,14 @@ Yetki sunucuda uygulanır (`requireRole`); arayüz sadece gizler.
 - Arayüz: gerçek tarayıcıda PIN → masa → ürün → gönder → KDS → ödeme akışı elle doğrulandı (ekran görüntüleri `docs/screenshots`).
 - Donanım: yazıcı yoksa `DRY_RUN=1` ile `.bin` + `.txt` üretilir; sahadaki yazıcıda codepage testi gerekir.
 
+## 9.1 Arayüz teması
+
+Açık tema: beyaz kartlar (#fff), #f5f6f8 sayfa zemini, kırmızı marka rengi (#d91e2e → #b3121f), 1px #e8eaef kenarlık, yumuşak gölge. Kırmızı yalnızca **marka + birincil aksiyon + tutar** için kullanılır; ikincil metinler #4b5563 ile kontrastlı tutulur. Dokunmatik hedefler ≥ 44 px, para rakamları tabular-nums.
+
+## 9.2 Adisyon iptali
+
+Yanlış açılan adisyon `POST /api/orders/:id/void` ile iptal edilir (yalnızca yönetici, ödeme alınmamışsa). Durum `void` olur, masa boşalır; satırlar silinmez (denetim izi kalır).
+
 ## 10. Masa düzeni ve ürün görselleri
 
 ### Yerleşim planı
