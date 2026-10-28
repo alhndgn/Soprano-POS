@@ -54,6 +54,16 @@
 - [x] `scripts/reset_demo.py` — demo verisini tazeler (iptal + yeni vardiya + 3 dolu masa)
 - [x] Ekran görüntüleri yeni temayla güncellendi, görsel inceleme yapıldı
 
+## Faz 7 — Detaylı ürün yönetimi + içindekiler (tamam)
+- [x] Şema: `products.description`, `product_ingredients`, `line_ingredients`
+- [x] Pizza tarifleri ve hazırlanış metinleri tohumlandı (`db/recipes.ts`)
+- [x] Ürün CRUD API (boyut + içerik + seçenek grupları ile birlikte, yumuşak silme)
+- [x] Ürün yönetim ekranı: temel bilgi, hazırlanış, boyutlar, içindekiler, seçenekler, görsel, özet
+- [x] Sipariş panelinde hazırlanış + içindekiler (çıkar/ekle, ✓ işaretleri, fiyat farkı)
+- [x] Sepet satırında “X yok / + Y” etiketleri, KOT’ta `CIKAR/EKLE` satırları
+- [x] `Ek Malzeme` grubu ile içerik ekstraları tekilleştirildi
+- [x] 13 birim testi, 20 ürün + 16 yerleşim e2e doğrulaması, UI’dan kaydetme testi
+
 ## Sonraki sürüm (v0.2)
 1. **Paket servis**: müşteri/adres defteri, bölge, kurye ataması, teslim durumu
 2. **QR menü / online sipariş**: mevcut WordPress kurulumuna bağlanır

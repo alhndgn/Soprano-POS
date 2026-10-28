@@ -3,11 +3,13 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useApp } from '../App.tsx'
 import { api, elapsed, lineTotal, money, type Order, type OrderLine, type Product } from '../api.ts'
 
+type IngChoice = { id: number; mode: 'removed' | 'added' }
 type SheetState = {
   product: Product
   variantId: number | null
   qty: number
   mods: number[]
+  ings: IngChoice[]
   note: string
 }
 
@@ -26,6 +28,7 @@ export default function OrderPage() {
   const [moveOpen, setMoveOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [descOpen, setDescOpen] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -71,11 +74,13 @@ export default function OrderPage() {
       )
       return
     }
+    setDescOpen(false)
     setSheet({
       product: p,
       variantId: p.variants.length === 1 ? p.variants[0].id : null,
       qty: 1,
       mods: [],
+      ings: [],
       note: '',
     })
   }
@@ -84,7 +89,10 @@ export default function OrderPage() {
     if (!sheet) return 0
     const v = sheet.product.variants.find((x) => x.id === sheet.variantId)
     const mods = sheet.product.groups.flatMap((g) => g.modifiers).filter((m) => sheet.mods.includes(m.id))
-    return ((v?.price ?? 0) + mods.reduce((s, m) => s + m.price, 0)) * sheet.qty
+    const added = sheet.product.ingredients
+      .filter((i) => sheet.ings.some((c) => c.id === i.id && c.mode === 'added'))
+      .reduce((s, i) => s + i.price, 0)
+    return ((v?.price ?? 0) + mods.reduce((s, m) => s + m.price, 0) + added) * sheet.qty
   }, [sheet])
 
   const sheetValid = useMemo(() => {
@@ -104,6 +112,7 @@ export default function OrderPage() {
         variantId: sheet.variantId,
         qty: sheet.qty,
         modifierIds: sheet.mods,
+        ingredients: sheet.ings,
         note: sheet.note.trim() || undefined,
       }),
     )
@@ -282,6 +291,20 @@ export default function OrderPage() {
               </button>
             </div>
 
+            {sheet.product.description && (
+              <div className="recipe-box">
+                <div className="recipe-head">
+                  <span>Hazırlanışı</span>
+                  {sheet.product.description.length > 150 && (
+                    <button className="link-btn" onClick={() => setDescOpen((v) => !v)}>
+                      {descOpen ? 'kısalt' : 'devamını oku'}
+                    </button>
+                  )}
+                </div>
+                <p className={descOpen ? '' : 'clamp3'}>{sheet.product.description}</p>
+              </div>
+            )}
+
             {sheet.product.variants.length > 1 && (
               <div className="mod-group">
                 <div className="mod-group-head">
@@ -328,6 +351,47 @@ export default function OrderPage() {
                 </div>
               </div>
             ))}
+
+            {sheet.product.ingredients.length > 0 && (
+              <div className="mod-group">
+                <div className="mod-group-head">
+                  <span>İçindekiler</span>
+                  <span>çıkarmak için dokun · fiyatlı olanlar eklenir</span>
+                </div>
+                <div className="mod-chips">
+                  {sheet.product.ingredients.map((ing) => {
+                    const choice = sheet.ings.find((c) => c.id === ing.id)
+                    const removed = choice?.mode === 'removed'
+                    const added = choice?.mode === 'added'
+                    const on = ing.included ? !removed : added
+                    return (
+                      <button
+                        key={ing.id}
+                        className={`chip ing${removed ? ' removed' : on ? ' on' : ''}`}
+                        onClick={() => {
+                          const rest = sheet.ings.filter((c) => c.id !== ing.id)
+                          const next = ing.included
+                            ? removed
+                              ? rest
+                              : [...rest, { id: ing.id, mode: 'removed' as const }]
+                            : added
+                              ? rest
+                              : [...rest, { id: ing.id, mode: 'added' as const }]
+                          setSheet({ ...sheet, ings: next })
+                        }}
+                      >
+                        {ing.name}
+                        {ing.included ? (
+                          <small>{removed ? 'çıkarıldı' : 'dahil'}</small>
+                        ) : (
+                          <small>+{money(ing.price)}</small>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className="mod-group">
               <div className="mod-group-head">
@@ -429,6 +493,15 @@ function CartLine({
           <div className="line-name">{line.name}</div>
           {line.modifiers.length > 0 && (
             <div className="line-mods">{line.modifiers.map((m) => m.name).join(' · ')}</div>
+          )}
+          {line.ingredients?.length > 0 && (
+            <div className="line-ings">
+              {line.ingredients.map((ing, idx) => (
+                <span key={idx} className={`ing-tag ${ing.mode}`}>
+                  {ing.mode === 'removed' ? `${ing.name} yok` : `+ ${ing.name}`}
+                </span>
+              ))}
+            </div>
           )}
           {line.note && <div className="line-note">“{line.note}”</div>}
         </div>

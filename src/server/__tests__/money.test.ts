@@ -24,6 +24,14 @@ describe('satır tutarı', () => {
   it('modifiersiz satır', () => {
     expect(lineGross({ qty: 3, unitPrice: 4000, vatRate: 20, modifiers: [] })).toBe(12000)
   })
+
+  it('eklenen içerik fiyatı satıra eklenir', () => {
+    expect(lineGross({ qty: 2, unitPrice: 30000, vatRate: 10, modifiers: [], ingredients: [{ price: 3000 }] })).toBe(66000)
+  })
+
+  it('çıkarılan içerik fiyat değiştirmez (0)', () => {
+    expect(lineGross({ qty: 1, unitPrice: 30000, vatRate: 10, modifiers: [], ingredients: [] })).toBe(30000)
+  })
 })
 
 describe('adisyon toplamı', () => {

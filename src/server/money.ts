@@ -28,11 +28,14 @@ export type PricedLine = {
   unitPrice: number
   vatRate: number
   modifiers: { price: number }[]
+  /** siparişte eklenen içerikler (çıkarılanlar fiyat taşımaz) */
+  ingredients?: { price: number }[]
 }
 
 export function lineGross(l: PricedLine): number {
   const mods = l.modifiers.reduce((s, m) => s + m.price, 0)
-  return (l.unitPrice + mods) * l.qty
+  const ing = (l.ingredients ?? []).reduce((s, i) => s + i.price, 0)
+  return (l.unitPrice + mods + ing) * l.qty
 }
 
 export type OrderTotals = {

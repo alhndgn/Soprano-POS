@@ -10,6 +10,8 @@ Pizzacı için masa/adisyon, mutfak ekranı ve kasa yönetimi. Tek sunucu, table
 - **Adisyon:** boy + ek malzeme + not, mutfağa gönderim, satır iptali
 - **Mutfak ekranı:** Yeni → Hazırlanıyor → Hazır, canlı güncelleme
 - **Kasa:** parçalı ödeme, para üstü, vardiya aç/kapa, günlük rapor
+- **Detaylı ürün yönetimi:** hazırlanış metni, boyutlar, içindekiler, seçenek grupları, görsel
+- **İçindekiler siparişte:** malzemeyi çıkar/ekle (ekstralar fiyatlı), mutfağa `ÇIKAR/EKLE` olarak gider
 - **Menü görselleri:** ürün fotoğrafı yükle, sipariş kartlarında görünsün
 - **Açık tema:** beyaz zemin + kırmızı vurgu, tablette yüksek kontrast
 - **Adisyon iptali:** yanlış açılan adisyonu yönetici iptal eder
@@ -76,6 +78,7 @@ src/ui       React PWA (POS, KDS, rapor, yönetim)
 npm test            # 11 birim testi (para, KDV, yuvarlama, para üstü)
 npm run typecheck   # tsc --noEmit
 python scripts/e2e_layout.py     # 16 doğrulama: bölme/masa CRUD, yerleşim, silme korumaları
+python scripts/e2e_products.py   # 20 doğrulama: ürün CRUD, içerik fiyatı, KOT içeriği
 python scripts/make_food_images.py <token>   # demo yemek görselleri üret + yükle
 ```
 

@@ -67,6 +67,33 @@ CREATE TABLE IF NOT EXISTS products (
 
 -- Ürün görseli (yüklenen dosyanın yolu: /uploads/products/...)
 ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url text;
+-- Uzun açıklama / hazırlanış (menüde ve sipariş ekranında gösterilir)
+ALTER TABLE products ADD COLUMN IF NOT EXISTS description text;
+
+-- Ürünün içindekiler: dahil olanlar ve ekstra fiyatlı eklenebilirler
+CREATE TABLE IF NOT EXISTS product_ingredients (
+  id          serial PRIMARY KEY,
+  product_id  integer NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  name        text NOT NULL,
+  price       integer NOT NULL DEFAULT 0,   -- 0 = ücretsiz
+  included    boolean NOT NULL DEFAULT true, -- true: varsayılan içerik, false: ekstra
+  sort        integer NOT NULL DEFAULT 0,
+  active      boolean NOT NULL DEFAULT true
+);
+
+CREATE INDEX IF NOT EXISTS product_ingredients_idx ON product_ingredients(product_id) WHERE active;
+
+-- Sipariş satırında içerik değişikliği (çıkarıldı / eklendi)
+CREATE TABLE IF NOT EXISTS line_ingredients (
+  id            serial PRIMARY KEY,
+  line_id       integer NOT NULL REFERENCES order_lines(id) ON DELETE CASCADE,
+  ingredient_id integer REFERENCES product_ingredients(id) ON DELETE SET NULL,
+  name          text NOT NULL,
+  mode          text NOT NULL CHECK (mode IN ('removed','added')),
+  price         integer NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS line_ingredients_idx ON line_ingredients(line_id);
 
 -- Boyut/varyant: pizzalarda Küçük/Orta/Büyük, diğerlerinde tek "Standart"
 CREATE TABLE IF NOT EXISTS variants (

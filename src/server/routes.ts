@@ -36,6 +36,7 @@ type LineRow = {
   note: string | null
   status: string
   modifiers: { name: string; price: number }[]
+  ingredients: { name: string; price: number; mode: 'removed' | 'added' }[]
 }
 
 async function loadOrder(orderId: number) {
@@ -51,7 +52,9 @@ async function loadOrder(orderId: number) {
   const lines = await db.all<LineRow>(
     `SELECT ol.id, ol.order_id, ol.name, ol.qty, ol.unit_price, ol.vat_rate, ol.note, ol.status,
             COALESCE((SELECT json_agg(json_build_object('id', lm.modifier_id, 'name', lm.name, 'price', lm.price) ORDER BY lm.id)
-                      FROM line_modifiers lm WHERE lm.line_id = ol.id), '[]'::json) AS modifiers
+                      FROM line_modifiers lm WHERE lm.line_id = ol.id), '[]'::json) AS modifiers,
+            COALESCE((SELECT json_agg(json_build_object('name', li.name, 'price', li.price, 'mode', li.mode) ORDER BY li.id)
+                      FROM line_ingredients li WHERE li.line_id = ol.id), '[]'::json) AS ingredients
      FROM order_lines ol
      WHERE ol.order_id = $1 AND ol.status <> 'void'
      ORDER BY ol.id`,
@@ -66,6 +69,7 @@ async function loadOrder(orderId: number) {
     unitPrice: l.unit_price,
     vatRate: l.vat_rate,
     modifiers: l.modifiers,
+    ingredients: (l.ingredients ?? []).filter((i) => i.mode === 'added'),
   }))
   const totals = orderTotals(live)
   const paid = payments.reduce((s: number, p: any) => s + p.amount, 0)
@@ -141,7 +145,11 @@ export async function registerRoutes(app: FastifyInstance) {
       )
       const categories = await db.all<any>(`SELECT id, name, emoji FROM categories ORDER BY sort, id`)
       const products = await db.all<any>(
-        `SELECT id, category_id, name, vat_rate, image_url FROM products WHERE active = true ORDER BY sort, id`,
+        `SELECT id, category_id, name, vat_rate, image_url, description
+         FROM products WHERE active = true ORDER BY sort, id`,
+      )
+      const ingredients = await db.all<any>(
+        `SELECT id, product_id, name, price, included FROM product_ingredients WHERE active = true ORDER BY sort, id`,
       )
       const variants = await db.all<any>(
         `SELECT id, product_id, name, price FROM variants WHERE active = true ORDER BY sort, id`,
@@ -173,6 +181,10 @@ export async function registerRoutes(app: FastifyInstance) {
               name: p.name,
               vatRate: p.vat_rate,
               imageUrl: p.image_url,
+              description: p.description,
+              ingredients: ingredients
+                .filter((i) => i.product_id === p.id)
+                .map((i) => ({ id: i.id, name: i.name, price: i.price, included: i.included })),
               variants: variants.filter((v) => v.product_id === p.id),
               groups: pmg
                 .filter((x) => x.product_id === p.id)
@@ -267,6 +279,9 @@ export async function registerRoutes(app: FastifyInstance) {
           variantId: z.number().int().nullable().optional(),
           qty: z.number().int().min(1).max(99).default(1),
           modifierIds: z.array(z.number().int()).default([]),
+          ingredients: z
+            .array(z.object({ id: z.number().int(), mode: z.enum(['removed', 'added']) }))
+            .default([]),
           note: z.string().max(200).optional(),
         })
         .parse(req.body)
@@ -312,6 +327,24 @@ export async function registerRoutes(app: FastifyInstance) {
             m.name,
             m.price,
           ])
+        }
+
+        if (body.ingredients.length) {
+          const ids = body.ingredients.map((i) => i.id)
+          const rows = await tx.all<any>(
+            `SELECT id, name, price, included FROM product_ingredients
+             WHERE product_id = $1 AND active = true AND id = ANY($2::int[])`,
+            [product.id, `{${ids.join(',')}}`],
+          )
+          for (const choice of body.ingredients) {
+            const ing = rows.find((r) => r.id === choice.id)
+            if (!ing) continue
+            await tx.one(
+              `INSERT INTO line_ingredients (line_id, ingredient_id, name, mode, price)
+               VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+              [line!.id, ing.id, ing.name, choice.mode, choice.mode === 'added' ? ing.price : 0],
+            )
+          }
         }
         broadcast()
         return loadOrder(Number(id))
@@ -377,6 +410,8 @@ export async function registerRoutes(app: FastifyInstance) {
               qty: l.qty,
               note: l.note,
               modifiers: l.modifiers.map((m) => m.name),
+              removed: (l.ingredients ?? []).filter((i) => i.mode === 'removed').map((i) => i.name),
+              added: (l.ingredients ?? []).filter((i) => i.mode === 'added').map((i) => i.name),
             })),
           }),
         ],
@@ -484,7 +519,13 @@ export async function registerRoutes(app: FastifyInstance) {
                 qty: l.qty,
                 unitPrice: l.unit_price,
                 modifiers: l.modifiers.map((m) => m.name),
-                total: (l.unit_price + l.modifiers.reduce((s, m) => s + m.price, 0)) * l.qty,
+                removed: (l.ingredients ?? []).filter((i) => i.mode === 'removed').map((i) => i.name),
+                added: (l.ingredients ?? []).filter((i) => i.mode === 'added').map((i) => i.name),
+                total:
+                  (l.unit_price +
+                    l.modifiers.reduce((s, m) => s + m.price, 0) +
+                    (l.ingredients ?? []).filter((i) => i.mode === 'added').reduce((s, i) => s + i.price, 0)) *
+                  l.qty,
               })),
               subtotal: order.totals.subtotal,
               vatLines: order.totals.vatLines,
@@ -577,6 +618,216 @@ export async function registerRoutes(app: FastifyInstance) {
       requireRole(user(req), ['manager'])
       const body = z.object({ name: z.string().min(2), role: z.enum(['waiter', 'cashier', 'manager']), pin: z.string().min(3).max(12) }).parse(req.body)
       return db.one(`INSERT INTO users (name, role, pin_hash) VALUES ($1,$2,$3) RETURNING id, name, role`, [body.name, body.role, hashPin(body.pin)])
+    })
+
+    scope.get('/api/admin/modifier-groups', async (req) => {
+      requireRole(user(req), ['manager'])
+      const groups = await db.all<any>(`SELECT id, name, min_sel, max_sel FROM modifier_groups ORDER BY sort, id`)
+      const mods = await db.all<any>(`SELECT id, group_id, name, price FROM modifiers WHERE active=true ORDER BY sort, id`)
+      return groups.map((g) => ({
+        id: g.id,
+        name: g.name,
+        min: g.min_sel,
+        max: g.max_sel,
+        modifiers: mods.filter((m) => m.group_id === g.id),
+      }))
+    })
+
+    // ---------- ürün yönetimi (detaylı) ----------
+    const productBody = z.object({
+      name: z.string().min(1).max(80),
+      categoryId: z.number().int().positive(),
+      vatRate: z.number().int().min(0).max(30),
+      description: z.string().max(3000).nullable().optional(),
+      imageUrl: z.string().max(300).nullable().optional(),
+      sizes: z
+        .array(z.object({ id: z.number().int().optional(), name: z.string().min(1).max(30), price: z.number().int().min(0) }))
+        .min(1)
+        .max(10),
+      ingredients: z
+        .array(
+          z.object({
+            id: z.number().int().optional(),
+            name: z.string().min(1).max(40),
+            price: z.number().int().min(0),
+            included: z.boolean(),
+          }),
+        )
+        .max(40),
+      groupIds: z.array(z.number().int()).max(20),
+    })
+
+    scope.get('/api/admin/products/:id', async (req) => {
+      requireRole(user(req), ['manager'])
+      const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
+      const product = await db.one<any>(`SELECT * FROM products WHERE id=$1`, [id])
+      if (!product) {
+        const e: any = new Error('Ürün bulunamadı')
+        e.statusCode = 404
+        throw e
+      }
+      const variants = await db.all<any>(
+        `SELECT id, name, price FROM variants WHERE product_id=$1 AND active=true ORDER BY sort, id`,
+        [id],
+      )
+      const ingredients = await db.all<any>(
+        `SELECT id, name, price, included FROM product_ingredients WHERE product_id=$1 AND active=true ORDER BY sort, id`,
+        [id],
+      )
+      const groups = await db.all<{ group_id: number }>(`SELECT group_id FROM product_modifier_groups WHERE product_id=$1`, [id])
+      return {
+        id: product.id,
+        name: product.name,
+        categoryId: product.category_id,
+        vatRate: product.vat_rate,
+        description: product.description,
+        imageUrl: product.image_url,
+        sizes: variants,
+        ingredients,
+        groupIds: groups.map((g) => g.group_id),
+      }
+    })
+
+    scope.post('/api/admin/products', async (req) => {
+      requireRole(user(req), ['manager'])
+      const body = productBody.parse(req.body)
+      const sortRow = await db.one<{ n: number }>(`SELECT COALESCE(MAX(sort), 0) + 1 AS n FROM products WHERE category_id=$1`, [
+        body.categoryId,
+      ])
+      return db.tx(async (tx) => {
+        const product = await tx.one<any>(
+          `INSERT INTO products (category_id, name, vat_rate, description, image_url, sort)
+           VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+          [body.categoryId, body.name, body.vatRate, body.description ?? null, body.imageUrl ?? null, sortRow?.n ?? 0],
+        )
+        let i = 0
+        for (const s of body.sizes) {
+          await tx.one(`INSERT INTO variants (product_id, name, price, sort) VALUES ($1,$2,$3,$4) RETURNING id`, [
+            product!.id,
+            s.name,
+            s.price,
+            i++,
+          ])
+        }
+        i = 0
+        for (const ing of body.ingredients) {
+          await tx.one(
+            `INSERT INTO product_ingredients (product_id, name, price, included, sort) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+            [product!.id, ing.name, ing.price, ing.included, i++],
+          )
+        }
+        for (const gid of body.groupIds) {
+          await tx.one(`INSERT INTO product_modifier_groups (product_id, group_id) VALUES ($1,$2) RETURNING product_id`, [
+            product!.id,
+            gid,
+          ])
+        }
+        broadcast()
+        return product
+      })
+    })
+
+    scope.put('/api/admin/products/:id', async (req) => {
+      requireRole(user(req), ['manager'])
+      const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
+      const body = productBody.parse(req.body)
+      const current = await db.one<any>(`SELECT id FROM products WHERE id=$1`, [id])
+      if (!current) {
+        const e: any = new Error('Ürün bulunamadı')
+        e.statusCode = 404
+        throw e
+      }
+
+      return db.tx(async (tx) => {
+        await tx.one(
+          `UPDATE products SET category_id=$1, name=$2, vat_rate=$3, description=$4, image_url=$5 WHERE id=$6 RETURNING id`,
+          [body.categoryId, body.name, body.vatRate, body.description ?? null, body.imageUrl ?? null, id],
+        )
+
+        // boyutlar: gelenler güncellenir, yeni eklenir, olmayanlar pasife alınır
+        const keptSizes: number[] = []
+        let sort = 0
+        for (const s of body.sizes) {
+          if (s.id) {
+            const row = await tx.one<any>(
+              `UPDATE variants SET name=$1, price=$2, sort=$3, active=true WHERE id=$4 AND product_id=$5 RETURNING id`,
+              [s.name, s.price, sort++, s.id, id],
+            )
+            if (row) keptSizes.push(row.id)
+          } else {
+            const row = await tx.one<any>(
+              `INSERT INTO variants (product_id, name, price, sort) VALUES ($1,$2,$3,$4) RETURNING id`,
+              [id, s.name, s.price, sort++],
+            )
+            keptSizes.push(row!.id)
+          }
+        }
+        const allVariants = await tx.all<{ id: number }>(`SELECT id FROM variants WHERE product_id=$1 AND active=true`, [id])
+        for (const v of allVariants) {
+          if (!keptSizes.includes(v.id)) {
+            await tx.one(`UPDATE variants SET active=false WHERE id=$1 RETURNING id`, [v.id])
+          }
+        }
+
+        // içindekiler
+        const keptIng: number[] = []
+        sort = 0
+        for (const ing of body.ingredients) {
+          if (ing.id) {
+            const row = await tx.one<any>(
+              `UPDATE product_ingredients SET name=$1, price=$2, included=$3, sort=$4, active=true
+               WHERE id=$5 AND product_id=$6 RETURNING id`,
+              [ing.name, ing.price, ing.included, sort++, ing.id, id],
+            )
+            if (row) keptIng.push(row.id)
+          } else {
+            const row = await tx.one<any>(
+              `INSERT INTO product_ingredients (product_id, name, price, included, sort) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+              [id, ing.name, ing.price, ing.included, sort++],
+            )
+            keptIng.push(row!.id)
+          }
+        }
+        const allIng = await tx.all<{ id: number }>(
+          `SELECT id FROM product_ingredients WHERE product_id=$1 AND active=true`,
+          [id],
+        )
+        for (const g of allIng) {
+          if (!keptIng.includes(g.id)) {
+            await tx.one(`UPDATE product_ingredients SET active=false WHERE id=$1 RETURNING id`, [g.id])
+          }
+        }
+
+        // modifier grupları
+        await tx.all(`DELETE FROM product_modifier_groups WHERE product_id=$1`, [id])
+        for (const gid of body.groupIds) {
+          await tx.one(`INSERT INTO product_modifier_groups (product_id, group_id) VALUES ($1,$2) RETURNING product_id`, [id, gid])
+        }
+
+        broadcast()
+        return { ok: true, id }
+      })
+    })
+
+    scope.delete('/api/admin/products/:id', async (req) => {
+      requireRole(user(req), ['manager'])
+      const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
+      await db.one(`UPDATE products SET active=false WHERE id=$1 RETURNING id`, [id])
+      broadcast()
+      return { ok: true }
+    })
+
+    scope.post('/api/admin/categories', async (req) => {
+      requireRole(user(req), ['manager'])
+      const { name, emoji } = z
+        .object({ name: z.string().min(1).max(40), emoji: z.string().max(4).optional() })
+        .parse(req.body)
+      const sort = await db.one<{ n: number }>(`SELECT COALESCE(MAX(sort), 0) + 1 AS n FROM categories`)
+      return db.one(`INSERT INTO categories (name, emoji, sort) VALUES ($1,$2,$3) RETURNING *`, [
+        name,
+        emoji ?? '🍽',
+        sort!.n,
+      ])
     })
 
     // ---------- masa düzeni (bölmeler + masalar) ----------

@@ -6,11 +6,14 @@ export type Variant = { id: number; product_id: number; name: string; price: num
 export type Modifier = { id: number; group_id: number; name: string; price: number }
 export type ModGroup = { id: number; name: string; min: number; max: number; modifiers: Modifier[] }
 export type TableShape = 'square' | 'round' | 'rect'
+export type Ingredient = { id: number; name: string; price: number; included: boolean }
 export type Product = {
   id: number
   name: string
   vatRate: number
   imageUrl: string | null
+  description: string | null
+  ingredients: Ingredient[]
   variants: Variant[]
   groups: ModGroup[]
 }
@@ -62,6 +65,7 @@ export type Bootstrap = {
 }
 
 export type LineMod = { id?: number; name: string; price: number }
+export type LineIngredient = { name: string; price: number; mode: 'removed' | 'added' }
 export type OrderLine = {
   id: number
   order_id: number
@@ -72,6 +76,7 @@ export type OrderLine = {
   note: string | null
   status: 'new' | 'sent' | 'preparing' | 'ready' | 'served' | 'void'
   modifiers: LineMod[]
+  ingredients: LineIngredient[]
 }
 export type Totals = { subtotal: number; vat: number; total: number; vatLines: { rate: number; net: number; vat: number; gross: number }[] }
 export type Order = {
@@ -100,6 +105,29 @@ export type KdsLine = {
   sent_at: string
   table_name: string | null
   modifiers: { name: string }[]
+}
+
+export type AdminProduct = {
+  id: number
+  name: string
+  categoryId: number
+  vatRate: number
+  description: string | null
+  imageUrl: string | null
+  sizes: { id: number; name: string; price: number }[]
+  ingredients: Ingredient[]
+  groupIds: number[]
+}
+
+export type ProductInput = {
+  name: string
+  categoryId: number
+  vatRate: number
+  description: string | null
+  imageUrl: string | null
+  sizes: { id?: number; name: string; price: number }[]
+  ingredients: { id?: number; name: string; price: number; included: boolean }[]
+  groupIds: number[]
 }
 
 // ---------- istemci ----------
@@ -148,7 +176,14 @@ export const api = {
   order: (id: number) => request<Order>('GET', `/api/orders/${id}`),
   addLine: (
     orderId: number,
-    body: { productId: number; variantId: number | null; qty: number; modifierIds: number[]; note?: string },
+    body: {
+      productId: number
+      variantId: number | null
+      qty: number
+      modifierIds: number[]
+      ingredients?: { id: number; mode: 'removed' | 'added' }[]
+      note?: string
+    },
   ) => request<Order>('POST', `/api/orders/${orderId}/lines`, body),
   patchLine: (lineId: number, body: { qty?: number; note?: string | null; void?: boolean }) =>
     request<Order>('PATCH', `/api/orders/lines/${lineId}`, body),
@@ -184,6 +219,15 @@ export const api = {
   staff: () => request<{ id: number; name: string; role: Role; active: boolean }[]>('GET', '/api/admin/staff'),
   addStaff: (body: { name: string; role: Role; pin: string }) =>
     request('POST', '/api/admin/staff', body),
+
+  // ürün yönetimi
+  modifierGroups: () => request<ModGroup[]>('GET', '/api/admin/modifier-groups'),
+  product: (id: number) => request<AdminProduct>('GET', `/api/admin/products/${id}`),
+  createProduct: (body: ProductInput) => request<{ id: number }>('POST', '/api/admin/products', body),
+  updateProduct: (id: number, body: ProductInput) => request<{ ok: boolean }>('PUT', `/api/admin/products/${id}`, body),
+  deleteProduct: (id: number) => request<{ ok: boolean }>('DELETE', `/api/admin/products/${id}`),
+  addCategory: (name: string, emoji?: string) =>
+    request<{ id: number; name: string }>('POST', '/api/admin/categories', { name, emoji }),
 
   // masa düzeni
   layout: () => request<LayoutFloor[]>('GET', '/api/admin/layout'),
@@ -230,5 +274,6 @@ export function elapsed(iso: string): string {
 
 export function lineTotal(l: OrderLine): number {
   const mods = l.modifiers.reduce((s, m) => s + m.price, 0)
-  return (l.unit_price + mods) * l.qty
+  const ings = (l.ingredients ?? []).filter((i) => i.mode === 'added').reduce((s, i) => s + i.price, 0)
+  return (l.unit_price + mods + ings) * l.qty
 }

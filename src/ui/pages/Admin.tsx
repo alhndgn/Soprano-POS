@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, money, type Role } from '../api.ts'
 import LayoutEditor from '../components/LayoutEditor.tsx'
+import ProductEditor from '../components/ProductEditor.tsx'
 
 type MenuRow = Awaited<ReturnType<typeof api.adminMenu>>[number]
 type StaffRow = Awaited<ReturnType<typeof api.staff>>[number]
@@ -14,6 +15,7 @@ export default function Admin() {
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState({ name: '', role: 'waiter' as Role, pin: '' })
   const [uploading, setUploading] = useState<number | null>(null)
+  const [editor, setEditor] = useState<{ open: boolean; id: number | null }>({ open: false, id: null })
 
   const load = () => {
     api.adminMenu().then(setMenu).catch((e) => setError(e.message))
@@ -84,7 +86,12 @@ export default function Admin() {
         <div className="panel">
           <div className="panel-head">
             <h3>Ürünler ve görseller</h3>
-            <span className="pill">JPEG / PNG / WEBP · en fazla 5 MB</span>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <span className="pill">JPEG / PNG / WEBP · en fazla 5 MB</span>
+              <button className="btn primary sm" onClick={() => setEditor({ open: true, id: null })}>
+                + Yeni ürün
+              </button>
+            </div>
           </div>
           <table className="data-table">
             <thead>
@@ -94,6 +101,7 @@ export default function Admin() {
                 <th>Kategori</th>
                 <th>KDV</th>
                 <th>Fiyatlar</th>
+                <th style={{ width: 96 }}>İşlem</th>
               </tr>
             </thead>
             <tbody>
@@ -134,11 +142,33 @@ export default function Admin() {
                   <td style={{ fontVariantNumeric: 'tabular-nums' }}>
                     {p.variants.map((v) => `${v.name} ${money(v.price)}`).join(' · ')}
                   </td>
+                  <td>
+                    <button className="btn sm" onClick={() => setEditor({ open: true, id: p.id })}>
+                      Düzenle
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      )}
+
+      {editor.open && (
+        <ProductEditor
+          productId={editor.id}
+          categories={[
+            ...new Map(menu.map((m) => [m.category_id, { id: m.category_id, name: m.category }])).values(),
+          ]}
+          onClose={() => setEditor({ open: false, id: null })}
+          onSaved={(msg) => {
+            setError(null)
+            load()
+            console.info(msg)
+          }}
+          onError={setError}
+          onCategoriesChanged={load}
+        />
       )}
 
       {tab === 'staff' && (

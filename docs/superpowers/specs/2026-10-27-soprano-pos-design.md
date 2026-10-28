@@ -141,6 +141,36 @@ Yanlış açılan adisyon `POST /api/orders/:id/void` ile iptal edilir (yalnızc
 - Görsel yoksa kategori emojisiyle yer tutucu gösterilir; POS görsel olmadan da çalışır.
 - Yedeklemede `var/uploads` klasörü `var/pgdata` ile birlikte alınmalı.
 
+## 10.1 Ürün yönetimi ve içindekiler
+
+**Amaç:** menüyü koddan değil arayüzden yönetmek; ürünün hazırlanışını, boyutlarını ve içindekileri tanımlamak; sipariş sırasında içeriği çıkarıp ekleyebilmek.
+
+### Veri modeli
+- `products.description` — uzun hazırlanış metni (≤3000 karakter). Sipariş ekranında 3 satır kısaltılıp “devamını oku” ile açılır.
+- `product_ingredients(id, product_id, name, price, included, sort, active)`
+  - `included=true` → varsayılan içerik; siparişte çıkarılabilir (ücretsiz).
+  - `included=false` → ekstra; `price>0` ise siparişte eklenince ücret eklenir.
+- `line_ingredients(line_id, ingredient_id, name, mode, price)` — sipariş anındaki değişiklik (`removed` / `added`) snapshot olarak saklanır.
+
+### Ürün yönetimi ekranı (Yönetim → Menü → Yeni/Düzenle)
+- Temel bilgiler: ad, kategori (yeni kategori eklenebilir), KDV, hazırlanış metni
+- Boyutlar: sınırsız satır (ad + fiyat), sil/ekle
+- İçindekiler: ad, fiyat, `dahil|ekstra` anahtarı, sil/ekle
+- Seçenek grupları: Hamur, Sos gibi mevcut gruplar işaretlenir
+- Görsel: yükleme/değiştirme (JPEG/PNG/WEBP, 5 MB), sağ özette fiyat aralığı
+- Silme yumuşaktır (`active=false`) — geçmiş adisyonlar bozulmaz; boyut/içerik silmeleri de pasife alınır.
+
+### Sipariş akışı
+- Ürün detay panelinde: hazırlanış, boyut, seçenek grupları, **içindekiler** çipleri (dahil olanlar ✓ yeşil, çıkarılan kırmızı üstü çizili, ekstralar `+fiyat`).
+- Fiyat: `boyut + modifier + eklenen içerik` × adet; KDV dilimi ürünün oranıyla hesaplanır.
+- Sepette satır altında `Mozzarella yok` / `+ Ekstra kaşar` etiketleri görünür.
+- KOT fişinde `CIKAR: …` ve `EKLE: …` satırları mutfağa gider; adisyon fişinde de basılır.
+- `Ek Malzeme` modifier grubu, içeriği tanımlı ürünlerde otomatik olarak ayrılır (tekrarı önlemek için) — tek seferlik `migr:ekmalzeme-v1` bayrağı ile.
+
+### API
+`GET/POST/PUT/DELETE /api/admin/products[/:id]`, `GET /api/admin/modifier-groups`, `POST /api/admin/categories`.
+Sipariş satırı: `POST /api/orders/:id/lines` gövdesinde `ingredients: [{id, mode}]`.
+
 ## 11. Açık riskler
 
 1. **ÖKC/e-Arşiv yok** — nakit satışta yasal fiş yükümlülüğü için sonraki faz şart.

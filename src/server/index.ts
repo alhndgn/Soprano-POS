@@ -7,6 +7,7 @@ import { existsSync } from 'node:fs'
 import { initDb, db } from './db/client.ts'
 import { seed } from './db/seed.ts'
 import { ensureLayout } from './db/layout.ts'
+import { ensureRecipes } from './db/recipes.ts'
 import { registerRoutes } from './routes.ts'
 import { ZodError } from 'zod'
 
@@ -39,6 +40,9 @@ if (!users || users.c === 0) {
 
 const layout = await ensureLayout()
 if (layout.placed > 0) app.log.info({ placed: layout.placed }, 'masa yerleşimi kuruldu')
+
+const recipes = await ensureRecipes()
+if (recipes.products > 0) app.log.info(recipes, 'ürün içerikleri/açıklamaları eklendi')
 
 app.setErrorHandler((err: any, req, reply) => {
   if (err instanceof ZodError) {

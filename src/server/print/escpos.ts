@@ -53,7 +53,15 @@ export type ReceiptPayload = {
   tableName: string
   staffName: string
   dateISO: string
-  lines: { name: string; qty: number; unitPrice: number; modifiers: string[]; total: number }[]
+  lines: {
+    name: string
+    qty: number
+    unitPrice: number
+    modifiers: string[]
+    removed?: string[]
+    added?: string[]
+    total: number
+  }[]
   subtotal: number
   vatLines: { rate: number; vat: number; gross: number }[]
   total: number
@@ -67,7 +75,14 @@ export type KotPayload = {
   tableName: string
   staffName: string
   timeISO: string
-  lines: { name: string; qty: number; note?: string | null; modifiers: string[] }[]
+  lines: {
+    name: string
+    qty: number
+    note?: string | null
+    modifiers: string[]
+    removed?: string[]
+    added?: string[]
+  }[]
 }
 
 const tl = (k: number) => `${(Math.floor(k / 100)).toLocaleString('tr-TR')},${String(k % 100).padStart(2, '0')}`
@@ -83,6 +98,8 @@ export function buildReceipt(p: ReceiptPayload): Buffer {
   for (const l of p.lines) {
     e.row(`${l.qty} x ${l.name}`, tl(l.total))
     for (const m of l.modifiers) e.text(`   + ${m}`)
+    if (l.removed?.length) e.text(`   - ${l.removed.join(', ')}`)
+    if (l.added?.length) e.text(`   + ${l.added.join(', ')}`)
   }
   e.line()
   for (const v of p.vatLines) e.row(`KDV %${v.rate} dahil`, tl(v.gross))
@@ -106,6 +123,8 @@ export function buildKot(p: KotPayload): Buffer {
   for (const l of p.lines) {
     e.bold(true).text(`${l.qty} x ${l.name}`).bold(false)
     for (const m of l.modifiers) e.text(`   + ${m}`)
+    if (l.removed?.length) e.bold(true).text(`   CIKAR: ${l.removed.join(', ')}`).bold(false)
+    if (l.added?.length) e.text(`   EKLE: ${l.added.join(', ')}`)
     if (l.note) e.text(`   NOT: ${l.note}`)
   }
   e.line('=').feed(2).cut()
