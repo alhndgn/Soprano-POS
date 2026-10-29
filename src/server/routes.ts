@@ -6,7 +6,16 @@ import { pipeline } from 'node:stream/promises'
 import path from 'node:path'
 import { db } from './db/client.ts'
 import { hashPin, loginWithPin, logout, requireRole, userForToken, type AuthUser } from './auth.ts'
-import { orderTotals, type PricedLine } from './money.ts'
+import {
+  allocateDiscount,
+  allocatePayment,
+  discountAmount,
+  lineGross,
+  orderTotals,
+  vatBreakdown,
+  type PaymentDueLine,
+  type PricedLine,
+} from './money.ts'
 
 // ---------- SSE yayını ----------
 const subscribers = new Set<any>()
@@ -35,6 +44,8 @@ type LineRow = {
   vat_rate: number
   note: string | null
   status: string
+  paid_amount: number
+  paid_qty: number
   modifiers: { name: string; price: number }[]
   ingredients: { name: string; price: number; mode: 'removed' | 'added' }[]
 }
@@ -51,6 +62,12 @@ async function loadOrder(orderId: number) {
   if (!order) return null
   const lines = await db.all<LineRow>(
     `SELECT ol.id, ol.order_id, ol.name, ol.qty, ol.unit_price, ol.vat_rate, ol.note, ol.status,
+            COALESCE((SELECT SUM(pa.amount) FROM payment_allocations pa
+                      JOIN payments p ON p.id = pa.payment_id
+                      WHERE pa.line_id = ol.id AND p.order_id = ol.order_id), 0)::int AS paid_amount,
+            COALESCE((SELECT SUM(pa.qty) FROM payment_allocations pa
+                      JOIN payments p ON p.id = pa.payment_id
+                      WHERE pa.line_id = ol.id AND p.order_id = ol.order_id), 0)::int AS paid_qty,
             COALESCE((SELECT json_agg(json_build_object('id', lm.modifier_id, 'name', lm.name, 'price', lm.price) ORDER BY lm.id)
                       FROM line_modifiers lm WHERE lm.line_id = ol.id), '[]'::json) AS modifiers,
             COALESCE((SELECT json_agg(json_build_object('name', li.name, 'price', li.price, 'mode', li.mode) ORDER BY li.id)
@@ -61,7 +78,7 @@ async function loadOrder(orderId: number) {
     [orderId],
   )
   const payments = await db.all(
-    `SELECT id, method, amount, created_at FROM payments WHERE order_id = $1 ORDER BY id`,
+    `SELECT id, method, amount, tendered, change_amount, created_at FROM payments WHERE order_id = $1 ORDER BY id`,
     [orderId],
   )
   const live: PricedLine[] = lines.map((l) => ({
@@ -71,9 +88,45 @@ async function loadOrder(orderId: number) {
     modifiers: l.modifiers,
     ingredients: (l.ingredients ?? []).filter((i) => i.mode === 'added'),
   }))
-  const totals = orderTotals(live)
-  const paid = payments.reduce((s: number, p: any) => s + p.amount, 0)
-  return { ...order, lines, payments, totals, paid }
+  const grossByLine = live.map((l) => lineGross(l))
+  const grossTotal = grossByLine.reduce((sum, gross) => sum + gross, 0)
+  const discount = {
+    type: (order.discount_type ?? 'none') as 'none' | 'percent' | 'fixed',
+    value: Number(order.discount_value ?? 0),
+  }
+  const appliedDiscount = Math.min(Number(order.discount_amount ?? discountAmount(grossTotal, discount)), grossTotal)
+  const discountParts = allocateDiscount(grossByLine, appliedDiscount)
+  const discountedVatLines = vatBreakdown(
+    live.map((line, index) => ({ gross: grossByLine[index] - discountParts[index], rate: line.vatRate })),
+  )
+  const total = discountedVatLines.reduce((sum, line) => sum + line.gross, 0)
+  const vat = discountedVatLines.reduce((sum, line) => sum + line.vat, 0)
+  const totals = { subtotal: total - vat, vat, total, vatLines: discountedVatLines }
+  const paid = payments.reduce((s: number, p: any) => s + Number(p.amount), 0)
+  const decoratedLines = lines.map((line, index) => {
+    const paidAmount = Number(line.paid_amount ?? 0)
+    const lineTotal = grossByLine[index] - discountParts[index]
+    const remainingAmount = Math.max(0, lineTotal - paidAmount)
+    const paidQty = Math.min(line.qty, Number(line.paid_qty ?? 0))
+    return {
+      ...line,
+      paid_amount: paidAmount,
+      paid_qty: paidQty,
+      gross_amount: grossByLine[index],
+      discount_amount: discountParts[index],
+      remaining_amount: remainingAmount,
+      payment_status: paidQty >= line.qty || remainingAmount === 0 ? 'paid' : paidQty > 0 || paidAmount > 0 ? 'partial' : 'unpaid',
+    }
+  })
+  return {
+    ...order,
+    lines: decoratedLines,
+    payments,
+    totals,
+    paid,
+    remaining: Math.max(0, total - paid),
+    discount: { ...discount, amount: appliedDiscount },
+  }
 }
 
 function sessionToken(req: FastifyRequest): string | undefined {
@@ -441,6 +494,7 @@ export async function registerRoutes(app: FastifyInstance) {
     scope.post('/api/orders/:id/void', async (req) => {
       requireRole(user(req), ['manager'])
       const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
+      const { reason } = z.object({ reason: z.string().trim().min(3).max(300) }).parse(req.body)
       const order = await db.one<any>(`SELECT * FROM orders WHERE id=$1`, [id])
       if (!order) {
         const e: any = new Error('Adisyon bulunamadı')
@@ -458,7 +512,11 @@ export async function registerRoutes(app: FastifyInstance) {
         e.statusCode = 400
         throw e
       }
-      await db.one(`UPDATE orders SET status='void', closed_at=now() WHERE id=$1 RETURNING id`, [id])
+      await db.one(
+        `UPDATE orders SET status='void', closed_at=now(), void_reason=$1, voided_by=$2, voided_at=now()
+         WHERE id=$3 RETURNING id`,
+        [reason, user(req).id, id],
+      )
       broadcast()
       return { ok: true, orderId: id }
     })
@@ -466,11 +524,24 @@ export async function registerRoutes(app: FastifyInstance) {
     scope.post('/api/orders/:id/pay', async (req) => {
       requireRole(user(req), ['cashier', 'manager'])
       const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
-      const { payments } = z
+      const body = z
         .object({
           payments: z
-            .array(z.object({ method: z.enum(['cash', 'card', 'other']), amount: z.number().int().positive() }))
+            .array(
+              z.object({
+                method: z.enum(['cash', 'card', 'other']),
+                amount: z.number().int().positive(),
+                tendered: z.number().int().positive().optional(),
+                allocations: z
+                  .array(z.object({ lineId: z.number().int(), qty: z.number().int().positive() }))
+                  .default([]),
+              }),
+            )
             .min(1),
+          discount: z
+            .object({ type: z.enum(['none', 'percent', 'fixed']), value: z.number().int().min(0) })
+            .optional(),
+          customerName: z.string().max(120).nullable().optional(),
         })
         .parse(req.body)
       const order = await loadOrder(id)
@@ -479,69 +550,153 @@ export async function registerRoutes(app: FastifyInstance) {
         e.statusCode = 400
         throw e
       }
-      const tendered = payments.reduce((s, p) => s + p.amount, 0)
-      const total = order.totals.total
-      if (tendered < total) {
-        const e: any = new Error('Ödeme tutarı yetersiz')
-        e.statusCode = 400
+
+      const fail = (message: string, statusCode = 400): never => {
+        const e: any = new Error(message)
+        e.statusCode = statusCode
         throw e
       }
-      // Para üstü ciroya yazılmaz: her ödeme kalan borçla sınırlanır.
-      let due = total
-      const applied: { method: 'cash' | 'card' | 'other'; amount: number }[] = []
-      for (const p of payments) {
-        const amount = Math.min(p.amount, due)
-        if (amount > 0) {
-          applied.push({ method: p.method, amount })
-          due -= amount
-        }
+      const grossLines = order.lines.map((line: any) =>
+        lineGross({
+          qty: line.qty,
+          unitPrice: line.unit_price,
+          vatRate: line.vat_rate,
+          modifiers: line.modifiers,
+          ingredients: (line.ingredients ?? []).filter((i: any) => i.mode === 'added'),
+        }),
+      )
+      const grossTotal = grossLines.reduce((sum: number, value: number) => sum + value, 0)
+      const hasExistingPayments = order.payments.length > 0
+      const storedDiscount = order.discount ?? { type: 'none', value: 0, amount: 0 }
+      const requestedDiscount = body.discount ?? {
+        type: storedDiscount.type as 'none' | 'percent' | 'fixed',
+        value: Number(storedDiscount.value ?? 0),
       }
-      const changeDue = tendered - total
+      if (
+        hasExistingPayments &&
+        body.discount &&
+        (body.discount.type !== storedDiscount.type || body.discount.value !== Number(storedDiscount.value ?? 0))
+      ) {
+        fail('Parçalı ödeme başladıktan sonra iskonto değiştirilemez')
+      }
+      const appliedDiscount = discountAmount(grossTotal, requestedDiscount)
+      const discountParts = allocateDiscount(grossLines, appliedDiscount)
+      const total = grossTotal - appliedDiscount
+      const oldPaid = Number(order.paid ?? 0)
+      const dueLines: PaymentDueLine[] = order.lines.map((line: any, index: number) => ({
+        lineId: line.id,
+        due: Math.max(0, grossLines[index] - discountParts[index] - Number(line.paid_amount ?? 0)),
+        qty: Math.max(0, line.qty - Number(line.paid_qty ?? 0)),
+      }))
+
+      // Eski payload'lar allocations göndermiyorsa tam borç davranışını koru.
+      const hasAllocations = body.payments.some((payment) => payment.allocations.length > 0)
+      const requestedTendered = body.payments.reduce((sum, payment) => sum + (payment.tendered ?? payment.amount), 0)
+      if (!hasAllocations && oldPaid + requestedTendered < total) fail('Ödeme tutarı yetersiz')
+
+      const finalVatLines = vatBreakdown(
+        order.lines.map((line: any, index: number) => ({ gross: grossLines[index] - discountParts[index], rate: line.vat_rate })),
+      )
+      const finalVat = finalVatLines.reduce((sum, line) => sum + line.vat, 0)
+      const finalTotals = { subtotal: total - finalVat, vat: finalVat, total, vatLines: finalVatLines }
+      const paymentRows: { method: 'cash' | 'card' | 'other'; amount: number }[] = []
+      let totalApplied = 0
+      let totalChange = 0
+      const customerName = body.customerName?.trim() || null
       const meta = (await db.one<any>(`SELECT value FROM settings WHERE key='outlet'`))?.value ?? {}
 
       await db.tx(async (tx) => {
-        for (const p of applied) {
+        const workingDue = dueLines.map((line) => ({ ...line }))
+        for (const payment of body.payments) {
+          const tendered = payment.method === 'cash' ? payment.tendered ?? payment.amount : payment.amount
+          if (payment.method === 'cash' && tendered < payment.amount) fail('Nakit alınan tutar, ödeme tutarından küçük olamaz')
+          const selected = payment.allocations.length
+            ? [...new Map(payment.allocations.map((item) => [item.lineId, item])).values()]
+            : workingDue.filter((line) => line.due > 0).map((line) => ({ lineId: line.lineId, qty: line.qty }))
+          const allocations = allocatePayment(workingDue, payment.amount, selected)
+          const applied = allocations.reduce((sum, allocation) => sum + allocation.amount, 0)
+          if (applied <= 0) fail('Ödenecek ürün seçilmedi veya satırın borcu kalmadı')
+          if (payment.method !== 'cash' && applied !== payment.amount) fail('Kart tutarı seçili ürün borcunu aşamaz')
+          const change = payment.method === 'cash' ? Math.max(0, tendered - applied) : 0
+          const inserted = await tx.one<any>(
+            `INSERT INTO payments (order_id, method, amount, tendered, change_amount, taken_by)
+             VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+            [id, payment.method, applied, tendered, change, user(req).id],
+          )
+          for (const allocation of allocations) {
+            await tx.one(
+              `INSERT INTO payment_allocations (payment_id, line_id, qty, amount) VALUES ($1,$2,$3,$4) RETURNING id`,
+              [inserted.id, allocation.lineId, allocation.qty, allocation.amount],
+            )
+            const due = workingDue.find((line) => line.lineId === allocation.lineId)
+            if (due) {
+              const unitDue = Math.max(1, Math.floor((due.due + allocation.amount) / Math.max(1, due.qty)))
+              due.due = Math.max(0, due.due - allocation.amount)
+              due.qty = Math.max(0, due.qty - Math.min(due.qty, Math.floor(allocation.amount / unitDue)))
+            }
+          }
+          paymentRows.push({ method: payment.method, amount: applied })
+          totalApplied += applied
+          totalChange += change
+        }
+
+        if (!hasExistingPayments) {
           await tx.one(
-            `INSERT INTO payments (order_id, method, amount, taken_by) VALUES ($1,$2,$3,$4) RETURNING id`,
-            [id, p.method, p.amount, user(req).id],
+            `UPDATE orders SET customer_name=COALESCE($1, customer_name), discount_type=$2, discount_value=$3,
+             discount_amount=$4, discounted_by=$5, discounted_at=CASE WHEN $4 > 0 THEN now() ELSE NULL END
+             WHERE id=$6 RETURNING id`,
+            [customerName, requestedDiscount.type, requestedDiscount.value, appliedDiscount, appliedDiscount > 0 ? user(req).id : null, id],
+          )
+        } else if (customerName) {
+          await tx.one(`UPDATE orders SET customer_name=$1 WHERE id=$2 RETURNING id`, [customerName, id])
+        }
+
+        const newPaid = oldPaid + totalApplied
+        const nextStatus = newPaid >= total ? 'paid' : 'open'
+        await tx.one(
+          `UPDATE orders SET status=$1, closed_at=CASE WHEN $1='paid' THEN now() ELSE closed_at END WHERE id=$2 RETURNING id`,
+          [nextStatus, id],
+        )
+        if (nextStatus === 'paid') {
+          await tx.one(
+            `INSERT INTO print_jobs (kind, device, order_id, payload) VALUES ('receipt','receipt',$1,$2) RETURNING id`,
+            [
+              id,
+              JSON.stringify({
+                outletName: meta.name ?? 'Soprano',
+                orderId: order.id,
+                tableName: order.table_name ?? 'Paket',
+                staffName: user(req).name,
+                customerName: customerName ?? order.customer_name ?? null,
+                discount: { type: requestedDiscount.type, value: requestedDiscount.value, amount: appliedDiscount },
+                dateISO: new Date().toISOString(),
+                lines: order.lines.map((line: LineRow) => ({
+                  name: line.name,
+                  qty: line.qty,
+                  unitPrice: line.unit_price,
+                  modifiers: line.modifiers.map((m) => m.name),
+                  removed: (line.ingredients ?? []).filter((i) => i.mode === 'removed').map((i) => i.name),
+                  added: (line.ingredients ?? []).filter((i) => i.mode === 'added').map((i) => i.name),
+                  total:
+                    (line.unit_price +
+                      line.modifiers.reduce((s, m) => s + m.price, 0) +
+                      (line.ingredients ?? []).filter((i) => i.mode === 'added').reduce((s, i) => s + i.price, 0)) *
+                    line.qty,
+                })),
+                subtotal: finalTotals.subtotal,
+                vatLines: finalTotals.vatLines,
+                total: finalTotals.total,
+                payments: paymentRows,
+                change: totalChange,
+                footer: meta.footer ?? '',
+              }),
+            ],
           )
         }
-        await tx.one(`UPDATE orders SET status='paid', closed_at=now() WHERE id=$1 RETURNING id`, [id])
-        await tx.one(
-          `INSERT INTO print_jobs (kind, device, order_id, payload) VALUES ('receipt','receipt',$1,$2) RETURNING id`,
-          [
-            id,
-            JSON.stringify({
-              outletName: meta.name ?? 'Soprano',
-              orderId: order.id,
-              tableName: order.table_name ?? 'Paket',
-              staffName: user(req).name,
-              dateISO: new Date().toISOString(),
-              lines: order.lines.map((l: LineRow) => ({
-                name: l.name,
-                qty: l.qty,
-                unitPrice: l.unit_price,
-                modifiers: l.modifiers.map((m) => m.name),
-                removed: (l.ingredients ?? []).filter((i) => i.mode === 'removed').map((i) => i.name),
-                added: (l.ingredients ?? []).filter((i) => i.mode === 'added').map((i) => i.name),
-                total:
-                  (l.unit_price +
-                    l.modifiers.reduce((s, m) => s + m.price, 0) +
-                    (l.ingredients ?? []).filter((i) => i.mode === 'added').reduce((s, i) => s + i.price, 0)) *
-                  l.qty,
-              })),
-              subtotal: order.totals.subtotal,
-              vatLines: order.totals.vatLines,
-              total: order.totals.total,
-              payments: applied,
-              change: changeDue,
-              footer: meta.footer ?? '',
-            }),
-          ],
-        )
       })
-      broadcast('paid')
-      return { ok: true, change: changeDue, orderId: id }
+      const status = oldPaid + totalApplied >= total ? 'paid' : 'open'
+      broadcast(status === 'paid' ? 'paid' : 'change')
+      return { ok: true, change: totalChange, applied: paymentRows, orderId: id, status }
     })
 
     // ---------- mutfak ----------
@@ -579,14 +734,52 @@ export async function registerRoutes(app: FastifyInstance) {
         [day],
       )
       const orderCount = await db.one<any>(
-        `SELECT count(*)::int AS c, COALESCE(SUM(total),0)::int AS revenue FROM (
-           SELECT o.id, COALESCE(SUM((ol.unit_price
+        `SELECT count(*)::int AS c,
+                COALESCE(SUM(GREATEST(gross_total - discount_amount, 0)),0)::int AS revenue,
+                COALESCE(SUM(discount_amount),0)::int AS discount_total
+         FROM (
+           SELECT o.id, o.discount_amount,
+             COALESCE((SELECT SUM((ol.unit_price
+               + COALESCE((SELECT SUM(lm.price) FROM line_modifiers lm WHERE lm.line_id=ol.id),0)
+               + COALESCE((SELECT SUM(li.price) FROM line_ingredients li WHERE li.line_id=ol.id AND li.mode='added'),0)
+             ) * ol.qty) FROM order_lines ol WHERE ol.order_id=o.id AND ol.status<>'void'),0)::int AS gross_total
+           FROM orders o
+           WHERE o.status='paid' AND o.closed_at::date = $1::date
+         ) x`,
+        [day],
+      )
+      const paidOrders = await db.all<any>(
+        `SELECT o.id AS order_id, t.name AS table_name, o.customer_name, o.discount_amount,
+                GREATEST(o.gross_total - o.discount_amount, 0)::int AS total,
+                COALESCE((SELECT string_agg(DISTINCT p.method, ', ' ORDER BY p.method)
+                          FROM payments p WHERE p.order_id=o.id), '') AS payment_methods,
+                o.closed_at
+         FROM (
+           SELECT o.*, COALESCE((SELECT SUM((ol.unit_price
              + COALESCE((SELECT SUM(lm.price) FROM line_modifiers lm WHERE lm.line_id=ol.id),0)
              + COALESCE((SELECT SUM(li.price) FROM line_ingredients li WHERE li.line_id=ol.id AND li.mode='added'),0)
-           ) * ol.qty),0)::int AS total
-           FROM orders o LEFT JOIN order_lines ol ON ol.order_id=o.id AND ol.status<>'void'
-           WHERE o.status='paid' AND o.closed_at::date = $1::date GROUP BY o.id
-         ) x`,
+           ) * ol.qty) FROM order_lines ol WHERE ol.order_id=o.id AND ol.status<>'void'),0)::int AS gross_total
+           FROM orders o WHERE o.status='paid' AND o.closed_at::date=$1::date
+         ) o
+         LEFT JOIN tables t ON t.id=o.table_id ORDER BY o.closed_at DESC`,
+        [day],
+      )
+      const voidedOrders = await db.all<any>(
+        `SELECT o.id AS order_id, t.name AS table_name, o.customer_name, o.discount_amount,
+                COALESCE((SELECT SUM((ol.unit_price
+                  + COALESCE((SELECT SUM(lm.price) FROM line_modifiers lm WHERE lm.line_id=ol.id),0)
+                  + COALESCE((SELECT SUM(li.price) FROM line_ingredients li WHERE li.line_id=ol.id AND li.mode='added'),0)
+                ) * ol.qty) FROM order_lines ol WHERE ol.order_id=o.id AND ol.status<>'void'),0)::int AS gross_total,
+                GREATEST(COALESCE((SELECT SUM((ol.unit_price
+                  + COALESCE((SELECT SUM(lm.price) FROM line_modifiers lm WHERE lm.line_id=ol.id),0)
+                  + COALESCE((SELECT SUM(li.price) FROM line_ingredients li WHERE li.line_id=ol.id AND li.mode='added'),0)
+                ) * ol.qty) FROM order_lines ol WHERE ol.order_id=o.id AND ol.status<>'void'),0) - o.discount_amount, 0)::int AS total,
+                o.void_reason AS reason, u.name AS voided_by, COALESCE(o.voided_at, o.closed_at) AS voided_at
+         FROM orders o
+         LEFT JOIN tables t ON t.id=o.table_id
+         LEFT JOIN users u ON u.id=o.voided_by
+         WHERE o.status='void' AND COALESCE(o.voided_at, o.closed_at)::date=$1::date
+         ORDER BY COALESCE(o.voided_at, o.closed_at) DESC`,
         [day],
       )
       const topProducts = await db.all<any>(
@@ -604,7 +797,17 @@ export async function registerRoutes(app: FastifyInstance) {
          FROM payments p WHERE p.created_at::date=$1::date GROUP BY 1 ORDER BY 1`,
         [day],
       )
-      return { day, byMethod, orders: orderCount?.c ?? 0, revenue: orderCount?.revenue ?? 0, topProducts, hourly }
+      return {
+        day,
+        byMethod,
+        orders: orderCount?.c ?? 0,
+        revenue: orderCount?.revenue ?? 0,
+        discountTotal: orderCount?.discount_total ?? 0,
+        paidOrders,
+        voidedOrders,
+        topProducts,
+        hourly,
+      }
     })
 
     // ---------- yönetim (okuma) ----------

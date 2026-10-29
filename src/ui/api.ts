@@ -83,6 +83,32 @@ export type OrderLine = {
   status: 'new' | 'sent' | 'preparing' | 'ready' | 'served' | 'void'
   modifiers: LineMod[]
   ingredients: LineIngredient[]
+  paid_amount: number
+  paid_qty: number
+  gross_amount: number
+  discount_amount: number
+  remaining_amount: number
+  payment_status: 'unpaid' | 'partial' | 'paid'
+}
+export type Discount = { type: 'none' | 'percent' | 'fixed'; value: number; amount: number }
+export type PaymentAllocationInput = { lineId: number; qty: number }
+export type PaymentInput = {
+  method: 'cash' | 'card' | 'other'
+  amount: number
+  tendered?: number
+  allocations: PaymentAllocationInput[]
+}
+export type PaymentPayload = {
+  payments: PaymentInput[]
+  discount?: { type: 'none' | 'percent' | 'fixed'; value: number }
+  customerName?: string | null
+}
+export type PaymentResult = {
+  ok: boolean
+  change: number
+  applied: { method: 'cash' | 'card' | 'other'; amount: number }[]
+  orderId: number
+  status: 'open' | 'paid'
 }
 export type Totals = { subtotal: number; vat: number; total: number; vatLines: { rate: number; net: number; vat: number; gross: number }[] }
 export type Order = {
@@ -95,10 +121,13 @@ export type Order = {
   note: string | null
   opened_at: string
   closed_at: string | null
+  customer_name: string | null
+  discount: Discount
   lines: OrderLine[]
-  payments: { id: number; method: string; amount: number }[]
+  payments: { id: number; method: string; amount: number; tendered: number; change_amount: number }[]
   totals: Totals
   paid: number
+  remaining: number
 }
 
 export type KdsLine = {
@@ -194,10 +223,15 @@ export const api = {
   patchLine: (lineId: number, body: { qty?: number; note?: string | null; void?: boolean }) =>
     request<Order>('PATCH', `/api/orders/lines/${lineId}`, body),
   send: (orderId: number) => request<Order>('POST', `/api/orders/${orderId}/send`, {}),
-  voidOrder: (orderId: number) => request<{ ok: boolean }>('POST', `/api/orders/${orderId}/void`, {}),
+  voidOrder: (orderId: number, reason = 'Adisyon iptali') =>
+    request<{ ok: boolean; orderId: number }>('POST', `/api/orders/${orderId}/void`, { reason }),
   move: (orderId: number, tableId: number) => request<Order>('POST', `/api/orders/${orderId}/move`, { tableId }),
-  pay: (orderId: number, payments: { method: 'cash' | 'card' | 'other'; amount: number }[]) =>
-    request<{ ok: boolean; change: number }>('POST', `/api/orders/${orderId}/pay`, { payments }),
+  pay: (orderId: number, body: PaymentPayload | { method: 'cash' | 'card' | 'other'; amount: number }[]) => {
+    const payload: PaymentPayload = Array.isArray(body)
+      ? { payments: body.map((payment) => ({ ...payment, allocations: [] })) }
+      : body
+    return request<PaymentResult>('POST', `/api/orders/${orderId}/pay`, payload)
+  },
   kds: () => request<{ lines: KdsLine[] }>('GET', '/api/kds'),
   kdsStatus: (lineId: number, status: 'preparing' | 'ready' | 'served') =>
     request('POST', `/api/kds/lines/${lineId}/status`, { status }),
@@ -207,6 +241,27 @@ export const api = {
       revenue: number
       orders: number
       byMethod: { method: string; amount: number; count: number }[]
+      discountTotal: number
+      paidOrders: {
+        order_id: number
+        table_name: string | null
+        customer_name: string | null
+        discount_amount: number
+        total: number
+        payment_methods: string
+        closed_at: string
+      }[]
+      voidedOrders: {
+        order_id: number
+        table_name: string | null
+        customer_name: string | null
+        discount_amount: number
+        gross_total: number
+        total: number
+        reason: string
+        voided_by: string | null
+        voided_at: string
+      }[]
       topProducts: { name: string; qty: number; revenue: number }[]
       hourly: { hour: number; amount: number }[]
     }>('GET', `/api/reports/daily${date ? `?date=${date}` : ''}`),
