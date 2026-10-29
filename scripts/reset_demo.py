@@ -52,30 +52,56 @@ def main():
     def table(floor, name):
         return [t for t in floors[floor]["tables"] if t["name"] == name][0]
 
-    def add(order_id, product, variant_name, qty=1, mods=(), note=None):
-        v = [x for x in product["variants"] if x["name"] == variant_name][0]
-        ids = {m["name"]: m["id"] for g in product["groups"] for m in g["modifiers"]}
-        body = {"productId": product["id"], "variantId": v["id"], "qty": qty, "modifierIds": [ids[m] for m in mods]}
+    def add(order_id, product, variant_name, qty=1, mods=(), ings=(), note=None):
+        variant = [x for x in product["variants"] if x["name"] == variant_name] or product["variants"][:1]
+        if not variant:
+            print("  ! varyant yok:", product["name"])
+            return None
+        mod_ids = {m["name"]: m["id"] for g in product["groups"] for m in g["modifiers"]}
+        ing_ids = {i["name"]: i["id"] for i in product.get("ingredients", [])}
+
+        resolved_mods, resolved_ings = [], []
+        for name in mods:
+            if name in mod_ids:
+                resolved_mods.append(mod_ids[name])
+            else:
+                print("  ! modifier yok, atlandı:", name)
+        for name in ings:
+            if name in ing_ids:
+                resolved_ings.append({"id": ing_ids[name], "mode": "added"})
+            else:
+                print("  ! içerik yok, atlandı:", name)
+
+        body = {
+            "productId": product["id"],
+            "variantId": variant[0]["id"],
+            "qty": qty,
+            "modifierIds": resolved_mods,
+            "ingredients": resolved_ings,
+        }
         if note:
             body["note"] = note
-        return call("POST", f"/api/orders/{order_id}/lines", body, token)
+        status, payload = call("POST", f"/api/orders/{order_id}/lines", body, token)
+        if status >= 400:
+            print("  ! satır eklenemedi:", product["name"], status, payload)
+        return payload
 
     # Masa 2 — mutfakta
     s, o1 = call("POST", "/api/orders", {"tableId": table("İç Salon", "Masa 2")["id"], "guestCount": 2}, token)
-    add(o1["id"], pizzas[1], "Büyük", 1, ["İnce Hamur", "Ekstra Peynir"], "iyi pişsin")
-    add(o1["id"], pizzas[3], "Orta", 1, ["İnce Hamur"])
+    add(o1["id"], pizzas[1], "Büyük", 1, mods=["İnce Hamur"], ings=["Ekstra kaşar"], note="iyi pişsin")
+    add(o1["id"], pizzas[3], "Orta", 1, mods=["İnce Hamur"])
     add(o1["id"], drinks[0], "33cl", 2)
     call("POST", f"/api/orders/{o1['id']}/send", {}, token)
 
     # Masa 4 — hazırlanıyor
     s, o2 = call("POST", "/api/orders", {"tableId": table("İç Salon", "Masa 4")["id"], "guestCount": 3}, token)
-    add(o2["id"], pizzas[5], "Büyük", 2, ["İnce Hamur", "Jalapeno", "Mısır"], "acı olsun")
+    add(o2["id"], pizzas[5], "Büyük", 2, mods=["İnce Hamur"], ings=["Jalapeno", "Ekstra tavuk"], note="acı olsun")
     add(o2["id"], drinks[3], "40cl", 3)
     call("POST", f"/api/orders/{o2['id']}/send", {}, token)
 
     # Bahçe 1 — henüz gönderilmedi
     s, o3 = call("POST", "/api/orders", {"tableId": table("Bahçe", "Bahçe 1")["id"], "guestCount": 4}, token)
-    add(o3["id"], pizzas[0], "Orta", 2, ["Kalın Hamur", "Sucuk"])
+    add(o3["id"], pizzas[0], "Orta", 2, mods=["Kalın Hamur"], ings=["Ekstra mozzarella"])
     add(o3["id"], starters[0], "Standart", 1)
     add(o3["id"], drinks[1], "30cl", 4)
 

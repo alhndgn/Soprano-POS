@@ -135,7 +135,10 @@ export async function registerRoutes(app: FastifyInstance) {
       )
       const openOrders = await db.all<any>(
         `SELECT o.id, o.table_id, o.guest_count, o.opened_at, o.status,
-                COALESCE(SUM((ol.unit_price + COALESCE((SELECT SUM(lm.price) FROM line_modifiers lm WHERE lm.line_id = ol.id), 0)) * ol.qty), 0)::int AS total,
+                COALESCE(SUM((ol.unit_price
+                  + COALESCE((SELECT SUM(lm.price) FROM line_modifiers lm WHERE lm.line_id = ol.id), 0)
+                  + COALESCE((SELECT SUM(li.price) FROM line_ingredients li WHERE li.line_id = ol.id AND li.mode = 'added'), 0)
+                ) * ol.qty), 0)::int AS total,
                 COUNT(ol.id) FILTER (WHERE ol.status = 'sent')::int AS sent_lines,
                 COUNT(ol.id)::int AS line_count
          FROM orders o
@@ -577,14 +580,20 @@ export async function registerRoutes(app: FastifyInstance) {
       )
       const orderCount = await db.one<any>(
         `SELECT count(*)::int AS c, COALESCE(SUM(total),0)::int AS revenue FROM (
-           SELECT o.id, COALESCE(SUM((ol.unit_price + COALESCE((SELECT SUM(lm.price) FROM line_modifiers lm WHERE lm.line_id=ol.id),0)) * ol.qty),0)::int AS total
+           SELECT o.id, COALESCE(SUM((ol.unit_price
+             + COALESCE((SELECT SUM(lm.price) FROM line_modifiers lm WHERE lm.line_id=ol.id),0)
+             + COALESCE((SELECT SUM(li.price) FROM line_ingredients li WHERE li.line_id=ol.id AND li.mode='added'),0)
+           ) * ol.qty),0)::int AS total
            FROM orders o LEFT JOIN order_lines ol ON ol.order_id=o.id AND ol.status<>'void'
            WHERE o.status='paid' AND o.closed_at::date = $1::date GROUP BY o.id
          ) x`,
         [day],
       )
       const topProducts = await db.all<any>(
-        `SELECT ol.name, SUM(ol.qty)::int AS qty, SUM((ol.unit_price + COALESCE((SELECT SUM(lm.price) FROM line_modifiers lm WHERE lm.line_id=ol.id),0)) * ol.qty)::int AS revenue
+        `SELECT ol.name, SUM(ol.qty)::int AS qty, SUM((ol.unit_price
+           + COALESCE((SELECT SUM(lm.price) FROM line_modifiers lm WHERE lm.line_id=ol.id),0)
+           + COALESCE((SELECT SUM(li.price) FROM line_ingredients li WHERE li.line_id=ol.id AND li.mode='added'),0)
+         ) * ol.qty)::int AS revenue
          FROM order_lines ol JOIN orders o ON o.id=ol.order_id
          WHERE o.status='paid' AND o.closed_at::date=$1::date AND ol.status<>'void'
          GROUP BY ol.name ORDER BY qty DESC LIMIT 8`,

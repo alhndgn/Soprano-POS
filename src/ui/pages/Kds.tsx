@@ -78,7 +78,7 @@ export default function Kds() {
     <div className="page">
       <div className="page-head">
         <div>
-          <p className="eyebrow">KITCHEN DISPLAY</p>
+          <p className="eyebrow">MUTFAK EKRANI</p>
           <h1>Mutfak Ekranı</h1>
           <div className="sub">Siparişleri sırayla hazırla, durumu tek dokunuşla güncelle.</div>
         </div>

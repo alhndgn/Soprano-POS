@@ -58,7 +58,7 @@ export default function Tables() {
     <div className="page">
       <div className="page-head">
         <div>
-          <p className="eyebrow">FLOOR CONTROL</p>
+          <p className="eyebrow">SALON DURUMU</p>
           <h1>Masalar</h1>
           <div className="sub">Salon durumunu tek bakışta takip et, masaya dokunarak adisyonu aç.</div>
         </div>
@@ -150,7 +150,7 @@ export default function Tables() {
         <aside className="side-panel panel">
           <div className="panel-head">
             <div>
-              <p className="panel-kicker">LIVE SERVICE</p>
+              <p className="panel-kicker">CANLI SERVİS</p>
               <h3>Açık adisyonlar</h3>
             </div>
             <span className="pill">{openOrders.length}</span>

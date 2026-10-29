@@ -61,7 +61,7 @@ export default function Admin() {
     <div className="page">
       <div className="page-head">
         <div>
-          <p className="eyebrow">SETTINGS & CATALOG</p>
+          <p className="eyebrow">AYARLAR VE MENÜ</p>
           <h1>Yönetim</h1>
           <div className="sub">Masa düzeni · menü ve görseller · personel</div>
         </div>

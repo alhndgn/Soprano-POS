@@ -150,7 +150,7 @@ export default function OrderPage() {
       <div className="product-panel">
         <div className="product-head">
           <div>
-            <p className="eyebrow">ORDER BUILDER</p>
+            <p className="eyebrow">SİPARİŞ OLUŞTUR</p>
             <h2>{activeCat?.name}</h2>
             <div className="sub" style={{ color: 'var(--muted)', fontSize: 12.5, marginTop: 4 }}>
               {order.table_name ?? 'Masa'} · {order.guest_count} kişi · {elapsed(order.opened_at)}
@@ -198,7 +198,7 @@ export default function OrderPage() {
       <div className="cart">
         <div className="cart-head">
           <div>
-            <p className="panel-kicker">CURRENT ORDER</p>
+            <p className="panel-kicker">AKTİF ADİSYON</p>
             <h2>Adisyon #{order.id}</h2>
             <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 3 }}>
               {order.staff_name} · {order.lines.length} satır
@@ -508,13 +508,13 @@ function CartLine({
         <div>
           <div className="line-name">{line.name}</div>
           {line.modifiers.length > 0 && (
-            <div className="line-mods">{line.modifiers.map((m) => m.name).join(' · ')}</div>
+            <div className="line-mods">{line.modifiers.map((m) => (m.price > 0 ? `${m.name} +${money(m.price)}` : m.name)).join(' · ')}</div>
           )}
           {line.ingredients?.length > 0 && (
             <div className="line-ings">
               {line.ingredients.map((ing, idx) => (
                 <span key={idx} className={`ing-tag ${ing.mode}`}>
-                  {ing.mode === 'removed' ? `${ing.name} yok` : `+ ${ing.name}`}
+                  {ing.mode === 'removed' ? `${ing.name} yok` : `+ ${ing.name}${ing.price > 0 ? ` ${money(ing.price)}` : ''}`}
                 </span>
               ))}
             </div>
@@ -575,7 +575,7 @@ function PaymentModal({
   const pendingAmount = parsed > 0 ? parsed : payments.length ? 0 : remain
   const willPay = paid + pendingAmount
   const isPartial = parsed > 0 && parsed < remain
-  const quick = [total, Math.ceil(total / 10000) * 10000, Math.ceil(total / 5000) * 5000, Math.ceil(total / 10000) * 20000]
+  const quick = [total, Math.ceil(total / 5000) * 5000, Math.ceil(total / 10000) * 10000, Math.ceil(total / 50000) * 50000]
     .filter((v, i, arr) => v >= remain && arr.indexOf(v) === i)
     .slice(0, 4)
 
@@ -609,7 +609,7 @@ function PaymentModal({
 
         <div className="quick-amounts">
           {quick.map((q) => (
-            <button key={q} className="chip" onClick={() => setAmount((q / 100).toFixed(2))}>
+            <button key={q} className="chip" onClick={() => setAmount((q / 100).toFixed(2).replace('.', ','))}>
               {money(q)}
             </button>
           ))}

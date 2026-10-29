@@ -263,7 +263,7 @@ small { font-size: 12px; }
 .open-row-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .open-row-main b { font-size: 13.5px; }
 .open-row-main small { color: var(--muted); font-size: 12px; }
-.open-row-total { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 14px; color: var(--accent-2); }
+.open-row-total { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 14px; color: var(--text); }
 .side-total { display: flex; justify-content: space-between; padding: 12px 16px; border-top: 1px solid var(--line); background: #fafbfc; font-size: 12.5px; color: var(--muted); }
 .side-total b { color: var(--text); font-size: 15px; font-variant-numeric: tabular-nums; }
 
@@ -399,8 +399,8 @@ small { font-size: 12px; }
 .product-card:hover { border-color: var(--accent-line); background: #fffdfd; box-shadow: 0 10px 22px -18px rgba(16, 24, 40, 0.4); }
 .product-card:active { transform: scale(0.985); }
 .product-name { font-weight: 650; font-size: 14.5px; line-height: 1.25; }
-.product-price { color: var(--accent-2); font-weight: 750; font-size: 14.5px; font-variant-numeric: tabular-nums; margin-top: auto; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.product-add { color: var(--muted); font-size: 10.5px; font-weight: 750; letter-spacing: .01em; }
+.product-price { color: var(--text); font-weight: 750; font-size: 14.5px; font-variant-numeric: tabular-nums; margin-top: auto; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.product-add { color: var(--dim); font-size: 11px; font-weight: 750; letter-spacing: .01em; }
 .product-hint { font-size: 11.5px; color: var(--muted); }
 
 .cart {

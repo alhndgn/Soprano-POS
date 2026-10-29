@@ -24,7 +24,7 @@ export default function Shift() {
     <div className="page">
       <div className="page-head">
         <div>
-          <p className="eyebrow">CASH CONTROL</p>
+          <p className="eyebrow">KASA KONTROLÜ</p>
           <h1>Vardiya & Kasa</h1>
           <div className="sub">{shift ? `Açık · ${elapsed(shift.opened_at)}` : 'Kapalı'}</div>
         </div>
