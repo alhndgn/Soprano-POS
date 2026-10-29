@@ -61,21 +61,22 @@ export default function Admin() {
     <div className="page">
       <div className="page-head">
         <div>
+          <p className="eyebrow">SETTINGS & CATALOG</p>
           <h1>Yönetim</h1>
           <div className="sub">Masa düzeni · menü ve görseller · personel</div>
         </div>
       </div>
 
-      {error && <div className="toast error">{error}</div>}
+      {error && <div className="toast error" role="alert">{error}</div>}
 
-      <div className="tabs">
-        <button className={`tab${tab === 'layout' ? ' on' : ''}`} onClick={() => setTab('layout')}>
+      <div className="tabs" role="tablist" aria-label="Yönetim bölümleri">
+        <button type="button" role="tab" aria-selected={tab === 'layout'} className={`tab${tab === 'layout' ? ' on' : ''}`} onClick={() => setTab('layout')}>
           Masa Düzeni
         </button>
-        <button className={`tab${tab === 'menu' ? ' on' : ''}`} onClick={() => setTab('menu')}>
+        <button type="button" role="tab" aria-selected={tab === 'menu'} className={`tab${tab === 'menu' ? ' on' : ''}`} onClick={() => setTab('menu')}>
           Menü ({menu.length})
         </button>
-        <button className={`tab${tab === 'staff' ? ' on' : ''}`} onClick={() => setTab('staff')}>
+        <button type="button" role="tab" aria-selected={tab === 'staff'} className={`tab${tab === 'staff' ? ' on' : ''}`} onClick={() => setTab('staff')}>
           Personel ({staff.length})
         </button>
       </div>

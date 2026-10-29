@@ -20,11 +20,13 @@ type Ctx = {
 const AppCtx = createContext<Ctx>({ boot: null, me: null, refresh: async () => {}, loading: true, error: null })
 export const useApp = () => useContext(AppCtx)
 
-const Icon = ({ d }: { d: string }) => (
-  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d={d} />
-  </svg>
-)
+function Icon({ d }: { d: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d={d} />
+    </svg>
+  )
+}
 
 const NAV = [
   { to: '/tables', label: 'Masalar', icon: 'M4 6h16M4 12h16M4 18h16' },
@@ -68,7 +70,7 @@ export default function App() {
   // canlı güncelleme: SSE + 15 sn yedek
   useEffect(() => {
     if (!auth.get()) return
-    const es = new EventSource(`/api/events?token=${auth.get()}`)
+    const es = new EventSource(`/api/events?token=${encodeURIComponent(auth.get() ?? '')}`)
     const onChange = () => void refresh()
     es.addEventListener('change', onChange)
     es.addEventListener('kds', onChange)
@@ -90,31 +92,45 @@ export default function App() {
   if (loading && !boot) return <div className="boot">Yükleniyor…</div>
 
   const role = me?.role
-  const allowed = (to: string) =>
-    role === 'manager' ? true : to === '/tables' || to === '/kds' ? true : role === 'cashier' ? to !== '/admin' : false
+  const allowed = (to: string) => {
+    if (role === 'manager') return true
+    if (to === '/tables' || to === '/kds') return true
+    if (to === '/shift') return role === 'cashier'
+    return role === 'cashier' && to === '/reports'
+  }
 
   return (
     <AppCtx.Provider value={value}>
+      <a className="skip-link" href="#main-content">Ana içeriğe geç</a>
       <div className="shell">
-        <aside className="sidebar">
+        <aside className="sidebar" aria-label="Ana navigasyon">
           <div className="brand">
-            <span className="brand-mark">S</span>
-            <div>
+            <span className="brand-mark" aria-hidden="true">S</span>
+            <div className="brand-copy">
               <b>Soprano</b>
-              <small>POS</small>
+              <small>RESTORAN POS</small>
             </div>
           </div>
-          <nav>
+          <div className="sidebar-context">
+            <span className={`status-dot${boot?.shift ? ' on' : ''}`} aria-hidden="true" />
+            <div>
+              <b>{boot?.shift ? 'Vardiya açık' : 'Vardiya kapalı'}</b>
+              <small>{boot?.shift ? 'Operasyon devam ediyor' : 'İşleme başlamadan açın'}</small>
+            </div>
+          </div>
+          <nav aria-label="Bölümler">
             {NAV.filter((n) => allowed(n.to)).map((n) => (
               <NavLink key={n.to} to={n.to} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
                 <Icon d={n.icon} />
                 <span>{n.label}</span>
               </NavLink>
             ))}
-            <NavLink to="/shift" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
-              <Icon d="M12 7v5l3 2M12 3a9 9 0 100 18 9 9 0 000-18z" />
-              <span>Vardiya</span>
-            </NavLink>
+            {allowed('/shift') && (
+              <NavLink to="/shift" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
+                <Icon d="M12 7v5l3 2M12 3a9 9 0 100 18 9 9 0 000-18z" />
+                <span>Vardiya</span>
+              </NavLink>
+            )}
           </nav>
           <div className="sidebar-foot">
             <div className="who">
@@ -125,7 +141,9 @@ export default function App() {
               </div>
             </div>
             <button
+              type="button"
               className="btn ghost sm"
+              aria-label="Oturumu kapat"
               onClick={async () => {
                 await api.logout().catch(() => {})
                 auth.clear()
@@ -137,8 +155,8 @@ export default function App() {
           </div>
         </aside>
 
-        <main className="main">
-          {error && <div className="toast error">{error}</div>}
+        <main className="main" id="main-content" tabIndex={-1}>
+          {error && <div className="toast error" role="alert">{error}</div>}
           <Routes>
             <Route path="/tables" element={<Tables />} />
             <Route path="/order/:id" element={<OrderPage />} />

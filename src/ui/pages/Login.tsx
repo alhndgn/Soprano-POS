@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, auth } from '../api.ts'
 
@@ -8,6 +8,17 @@ export default function Login({ onDone }: { onDone: () => void }) {
   const [busy, setBusy] = useState(false)
   const [shake, setShake] = useState(false)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (busy) return
+      if (/^[0-9]$/.test(event.key)) press(event.key)
+      else if (event.key === 'Backspace' || event.key === 'Delete') press('del')
+      else if (event.key === 'Enter' && pin.length >= 4) press('ok')
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [busy, pin])
 
   const submit = async (value: string) => {
     if (busy) return
@@ -40,37 +51,39 @@ export default function Login({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <div className="login-wrap">
+    <main className="login-wrap" aria-label="Soprano POS giriş">
       <div className="login-card">
-        <div className="brand-mark">S</div>
-        <h1>Soprano POS</h1>
-        <p>Personel PIN kodunuzu girin</p>
+        <div className="brand-mark" aria-hidden="true">S</div>
+        <p className="login-kicker">SOPRANO / RESTAURANT OPERATIONS</p>
+        <h1>Operasyona giriş</h1>
+        <p>Personel PIN kodunuzu girin. Kasa, masalar ve mutfak tek yerde.</p>
 
-        <div className={`pin-display${shake ? ' shake' : ''}`}>
+        <div className={`pin-display${shake ? ' shake' : ''}`} aria-label={`${pin.length} hane girildi}`}>
           {Array.from({ length: 4 }).map((_, i) => (
-            <span key={i} className={`pin-dot${i < pin.length ? ' on' : ''}`} />
+            <span key={i} className={`pin-dot${i < pin.length ? ' on' : ''}`} aria-hidden="true" />
           ))}
         </div>
 
         <div className="pin-pad">
           {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((k) => (
-            <button key={k} className="pin-key" onClick={() => press(k)} disabled={busy}>
+            <button type="button" key={k} className="pin-key" aria-label={`${k} gir`} onClick={() => press(k)} disabled={busy}>
               {k}
             </button>
           ))}
-          <button className="pin-key ghost" onClick={() => press('del')}>
+          <button type="button" className="pin-key ghost" aria-label="Son haneyi sil" onClick={() => press('del')}>
             Sil
           </button>
-          <button className="pin-key" onClick={() => press('0')}>
+          <button type="button" className="pin-key" aria-label="0 gir" onClick={() => press('0')}>
             0
           </button>
-          <button className="pin-key ghost" onClick={() => press('ok')} disabled={pin.length < 4 || busy}>
+          <button type="button" className="pin-key ghost" aria-label="Giriş yap" onClick={() => press('ok')} disabled={pin.length < 4 || busy}>
             Giriş
           </button>
         </div>
 
-        <div className="pin-err">{error || (busy ? 'Kontrol ediliyor…' : '')}</div>
+        <div className="pin-err" role="alert" aria-live="polite">{error || (busy ? 'Kontrol ediliyor…' : '')}</div>
+        <div className="login-footnote">Yerel ağ üzerinde güvenli oturum</div>
       </div>
-    </div>
+    </main>
   )
 }

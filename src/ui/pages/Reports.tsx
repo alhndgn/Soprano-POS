@@ -22,6 +22,7 @@ export default function Reports() {
     <div className="page">
       <div className="page-head">
         <div>
+          <p className="eyebrow">BUSINESS PULSE</p>
           <h1>Günlük Rapor</h1>
           <div className="sub">{rep?.orders ?? 0} adisyon · ortalama {money(avg)}</div>
         </div>
@@ -30,7 +31,7 @@ export default function Reports() {
         </div>
       </div>
 
-      {error && <div className="toast error">{error}</div>}
+      {error && <div className="toast error" role="alert">{error}</div>}
 
       <div className="kpi-grid">
         <div className="kpi">

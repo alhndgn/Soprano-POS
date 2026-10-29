@@ -137,18 +137,20 @@ export default function OrderPage() {
 
   return (
     <div className="order-layout">
-      <div className="cat-rail">
+      <nav className="cat-rail" aria-label="Ürün kategorileri">
+        <span className="cat-rail-title">Menü</span>
         {menu.map((c) => (
           <button key={c.id} className={`cat-btn${c.id === activeCat?.id ? ' on' : ''}`} onClick={() => setCatId(c.id)}>
             <span>{c.emoji}</span>
             {c.name}
           </button>
         ))}
-      </div>
+      </nav>
 
       <div className="product-panel">
         <div className="product-head">
           <div>
+            <p className="eyebrow">ORDER BUILDER</p>
             <h2>{activeCat?.name}</h2>
             <div className="sub" style={{ color: 'var(--muted)', fontSize: 12.5, marginTop: 4 }}>
               {order.table_name ?? 'Masa'} · {order.guest_count} kişi · {elapsed(order.opened_at)}
@@ -163,9 +165,16 @@ export default function OrderPage() {
           {(activeCat?.products ?? []).map((p) => {
             const min = Math.min(...p.variants.map((v) => v.price))
             return (
-              <button key={p.id} className="product-card" onClick={() => pickProduct(p)} disabled={busy}>
+              <button
+                type="button"
+                key={p.id}
+                className="product-card"
+                aria-label={`${p.name}, ${money(min)}'den başlayan fiyat`}
+                onClick={() => pickProduct(p)}
+                disabled={busy}
+              >
                 {p.imageUrl ? (
-                  <img className="product-img" src={p.imageUrl} alt={p.name} loading="lazy" />
+                  <img className="product-img" src={p.imageUrl} alt={p.name} loading="eager" decoding="async" />
                 ) : (
                   <div className="product-img placeholder">{activeCat?.emoji ?? '🍽'}</div>
                 )}
@@ -175,7 +184,10 @@ export default function OrderPage() {
                     {p.variants.length > 1 ? `${p.variants.length} boy` : p.variants[0]?.name}
                     {p.groups.length ? ` · ${p.groups.length} seçenek` : ''}
                   </div>
-                  <div className="product-price">{money(min)}</div>
+                  <div className="product-price">
+                    <span>{money(min)}</span>
+                    <span className="product-add">+ Ekle</span>
+                  </div>
                 </div>
               </button>
             )
@@ -186,6 +198,7 @@ export default function OrderPage() {
       <div className="cart">
         <div className="cart-head">
           <div>
+            <p className="panel-kicker">CURRENT ORDER</p>
             <h2>Adisyon #{order.id}</h2>
             <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 3 }}>
               {order.staff_name} · {order.lines.length} satır
@@ -217,7 +230,7 @@ export default function OrderPage() {
           </div>
         </div>
 
-        <div className="cart-lines">
+        <div className="cart-lines" aria-live="polite">
           {order.lines.length === 0 && (
             <div className="empty-cart">
               <span>🍕</span>
@@ -256,13 +269,15 @@ export default function OrderPage() {
           </div>
           <div className="cart-actions">
             <button
+              type="button"
               className="btn"
               disabled={busy || !order.lines.some((l) => l.status === 'new')}
+              aria-label="Yeni ürünleri mutfağa gönder"
               onClick={() => void doAction(() => api.send(orderId))}
             >
-              Mutfağa Gönder
+              {order.lines.some((l) => l.status === 'new') ? 'Mutfağa Gönder' : 'Mutfağa gönderildi'}
             </button>
-            <button className="btn primary" disabled={!canPay || order.lines.length === 0} onClick={() => setPayOpen(true)}>
+            <button type="button" className="btn primary" disabled={!canPay || order.lines.length === 0} onClick={() => setPayOpen(true)}>
               Ödeme Al
             </button>
           </div>
@@ -486,6 +501,7 @@ function CartLine({
   onVoid: () => void
 }) {
   const voided = line.status === 'void'
+  const unitTotal = lineTotal({ ...line, qty: 1 })
   return (
     <div className={`cart-line${voided ? ' voided' : ''}`}>
       <div className="line-top">
@@ -505,7 +521,10 @@ function CartLine({
           )}
           {line.note && <div className="line-note">“{line.note}”</div>}
         </div>
-        <div className="line-price">{money(lineTotal(line))}</div>
+        <div className="line-price">
+          <b>{money(lineTotal(line))}</b>
+          {line.qty > 1 && <small>{line.qty} × {money(unitTotal)}</small>}
+        </div>
       </div>
       <div className="line-bottom">
         <div className="stepper">

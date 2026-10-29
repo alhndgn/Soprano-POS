@@ -24,13 +24,14 @@ export default function Shift() {
     <div className="page">
       <div className="page-head">
         <div>
+          <p className="eyebrow">CASH CONTROL</p>
           <h1>Vardiya & Kasa</h1>
           <div className="sub">{shift ? `Açık · ${elapsed(shift.opened_at)}` : 'Kapalı'}</div>
         </div>
         {shift ? <span className="pill ok live">açık</span> : <span className="pill bad">kapalı</span>}
       </div>
 
-      {error && <div className="toast error">{error}</div>}
+      {error && <div className="toast error" role="alert">{error}</div>}
 
       <div className="shift-grid">
         <div className="panel">

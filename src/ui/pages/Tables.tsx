@@ -58,12 +58,13 @@ export default function Tables() {
     <div className="page">
       <div className="page-head">
         <div>
+          <p className="eyebrow">FLOOR CONTROL</p>
           <h1>Masalar</h1>
-          <div className="sub">
-            {stats.busy}/{stats.total} masa dolu · açık adisyon {money(stats.open)}
-          </div>
+          <div className="sub">Salon durumunu tek bakışta takip et, masaya dokunarak adisyonu aç.</div>
         </div>
         <div className="head-actions">
+          <div className="head-stat"><span>Dolu masa</span><b>{stats.busy}<small>/{stats.total}</small></b></div>
+          <div className="head-stat"><span>Açık adisyon</span><b>{money(stats.open)}</b></div>
           {boot?.shift ? (
             <span className="pill ok live">Vardiya açık · {elapsed(boot.shift.opened_at)}</span>
           ) : (
@@ -85,7 +86,7 @@ export default function Tables() {
 
       <div className="tables-layout">
         <div className="plan-wrap">
-          <div className="plan-canvas pos-plan">
+          <div className="plan-canvas pos-plan" role="region" aria-label={`${active?.name ?? 'Salon'} masa planı`}>
             <div className="plan-grid" />
             {(active?.tables ?? []).map((t, i) => {
               const p = positionOf(t, i)
@@ -111,6 +112,7 @@ export default function Tables() {
                     height: `${(p.h / CANVAS_H) * 100}%`,
                   }}
                   disabled={busy === t.id}
+                  aria-label={`${t.name}${o ? `, ${money(o.total)} açık adisyon` : `, ${t.seats} kişilik boş masa`}`}
                   onClick={() => void openTable(t.id, o?.id)}
                 >
                   <b>{t.name}</b>
@@ -136,13 +138,21 @@ export default function Tables() {
             )}
           </div>
           <div className="plan-hint">
-            {active?.name} · {active?.tables.length ?? 0} masa · plan görünümü (Yönetim → Masa Düzeni’nde düzenlenir)
+            <span>{active?.name} · {active?.tables.length ?? 0} masa · plan görünümü</span>
+            <span className="plan-legend" aria-label="Masa durumları">
+              <span><i className="legend-dot free" /> boş</span>
+              <span><i className="legend-dot busy" /> açık</span>
+              <span><i className="legend-dot sent" /> mutfakta</span>
+            </span>
           </div>
         </div>
 
         <aside className="side-panel panel">
           <div className="panel-head">
-            <h3>Açık adisyonlar</h3>
+            <div>
+              <p className="panel-kicker">LIVE SERVICE</p>
+              <h3>Açık adisyonlar</h3>
+            </div>
             <span className="pill">{openOrders.length}</span>
           </div>
           <div className="side-list">

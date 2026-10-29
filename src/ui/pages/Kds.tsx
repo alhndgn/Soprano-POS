@@ -36,12 +36,30 @@ export default function Kds() {
   }, [])
 
   const grouped = useMemo(() => {
-    const map = new Map<string, { orderId: number; table: string; sentAt: string; lines: KdsLine[] }>()
+    type Group = {
+      orderId: number
+      table: string
+      sentAt: string
+      lines: KdsLine[]
+      status: 'sent' | 'preparing' | 'ready'
+    }
+    const rank: Record<Group['status'], number> = { sent: 0, preparing: 1, ready: 2 }
+    const map = new Map<number, Group>()
     for (const l of lines) {
-      const key = `${l.order_id}-${l.status}`
-      if (!map.has(key))
-        map.set(key, { orderId: l.order_id, table: l.table_name ?? 'Masa', sentAt: l.sent_at, lines: [] })
-      map.get(key)!.lines.push(l)
+      const current = map.get(l.order_id)
+      if (!current) {
+        map.set(l.order_id, {
+          orderId: l.order_id,
+          table: l.table_name ?? 'Masa',
+          sentAt: l.sent_at,
+          lines: [l],
+          status: l.status,
+        })
+      } else {
+        current.lines.push(l)
+        if (rank[l.status] < rank[current.status]) current.status = l.status
+        if (new Date(l.sent_at).getTime() < new Date(current.sentAt).getTime()) current.sentAt = l.sent_at
+      }
     }
     return map
   }, [lines, tick])
@@ -60,12 +78,13 @@ export default function Kds() {
     <div className="page">
       <div className="page-head">
         <div>
+          <p className="eyebrow">KITCHEN DISPLAY</p>
           <h1>Mutfak Ekranı</h1>
-          <div className="sub">{lines.length} aktif satır · otomatik yenilenir</div>
+          <div className="sub">Siparişleri sırayla hazırla, durumu tek dokunuşla güncelle.</div>
         </div>
         <div className="head-actions">
-          <span className="pill ok live">canlı</span>
-          <button className="btn ghost sm" onClick={() => void document.documentElement.requestFullscreen?.()}>
+          <span className="pill ok live" role="status">{lines.length} aktif satır</span>
+          <button type="button" className="btn ghost sm" aria-label="Mutfak ekranını tam ekran aç" onClick={() => void document.documentElement.requestFullscreen?.()}>
             Tam ekran
           </button>
         </div>
@@ -73,27 +92,28 @@ export default function Kds() {
 
       {error && <div className="toast error">{error}</div>}
 
-      <div className="kds-board">
+      <div className="kds-board" aria-live="polite">
         {COLUMNS.map((col) => {
-          const cards = [...grouped.entries()].filter(([key]) => key.endsWith(`-${col.status}`))
+          const cards = [...grouped.values()].filter((group) => group.status === col.status)
           return (
-            <div className="kds-col" key={col.status}>
+            <section className={`kds-col kds-col-${col.status}`} key={col.status} aria-label={col.title}>
               <div className="kds-col-head">
                 <h3>{col.title}</h3>
                 <span className="pill">{cards.length}</span>
               </div>
               {cards.length === 0 && <div className="kds-empty">Bekleyen sipariş yok</div>}
-              {cards.map(([key, group]) => (
-                <div className={`kds-card ${col.status}`} key={key}>
+              {cards.map((group) => (
+                <div className={`kds-card ${col.status}`} key={group.orderId}>
                   <div className="kds-head">
                     <b>{group.table}</b>
-                    <span className="kds-time">#{group.orderId} · {elapsed(group.sentAt)}</span>
+                    <span className="kds-time">#{group.orderId} · {group.lines.length} satır · {elapsed(group.sentAt)}</span>
                   </div>
                   <div className="kds-items">
                     {group.lines.map((l) => (
                       <div className="kds-item" key={l.id}>
                         <b>{l.qty} ×</b> {l.name}
                         {l.modifiers.length > 0 && <small>{l.modifiers.map((m) => m.name).join(' · ')}</small>}
+                        {l.status !== col.status && <small className={`kds-line-status ${l.status}`}>{l.status === 'preparing' ? 'hazırlanıyor' : l.status === 'ready' ? 'hazır' : 'yeni'}</small>}
                         {l.note && <div className="note">NOT: {l.note}</div>}
                       </div>
                     ))}
@@ -103,7 +123,7 @@ export default function Kds() {
                       <button
                         className={`btn ${col.action.to === 'served' ? 'ghost' : 'primary'} sm`}
                         onClick={async () => {
-                          for (const l of group.lines) await move(l, col.action!.to)
+                          for (const l of group.lines.filter((line) => line.status === col.status)) await move(l, col.action!.to)
                         }}
                       >
                         {col.action.label}
@@ -112,7 +132,7 @@ export default function Kds() {
                   )}
                 </div>
               ))}
-            </div>
+            </section>
           )
         })}
       </div>

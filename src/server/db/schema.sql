@@ -83,18 +83,6 @@ CREATE TABLE IF NOT EXISTS product_ingredients (
 
 CREATE INDEX IF NOT EXISTS product_ingredients_idx ON product_ingredients(product_id) WHERE active;
 
--- Sipariş satırında içerik değişikliği (çıkarıldı / eklendi)
-CREATE TABLE IF NOT EXISTS line_ingredients (
-  id            serial PRIMARY KEY,
-  line_id       integer NOT NULL REFERENCES order_lines(id) ON DELETE CASCADE,
-  ingredient_id integer REFERENCES product_ingredients(id) ON DELETE SET NULL,
-  name          text NOT NULL,
-  mode          text NOT NULL CHECK (mode IN ('removed','added')),
-  price         integer NOT NULL DEFAULT 0
-);
-
-CREATE INDEX IF NOT EXISTS line_ingredients_idx ON line_ingredients(line_id);
-
 -- Boyut/varyant: pizzalarda Küçük/Orta/Büyük, diğerlerinde tek "Standart"
 CREATE TABLE IF NOT EXISTS variants (
   id          serial PRIMARY KEY,
@@ -186,6 +174,18 @@ CREATE TABLE IF NOT EXISTS line_modifiers (
   name        text NOT NULL,
   price       integer NOT NULL DEFAULT 0
 );
+
+-- Sipariş satırında içerik değişikliği (çıkarıldı / eklendi)
+CREATE TABLE IF NOT EXISTS line_ingredients (
+  id            serial PRIMARY KEY,
+  line_id       integer NOT NULL REFERENCES order_lines(id) ON DELETE CASCADE,
+  ingredient_id integer REFERENCES product_ingredients(id) ON DELETE SET NULL,
+  name          text NOT NULL,
+  mode          text NOT NULL CHECK (mode IN ('removed','added')),
+  price         integer NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS line_ingredients_idx ON line_ingredients(line_id);
 
 CREATE TABLE IF NOT EXISTS payments (
   id          serial PRIMARY KEY,

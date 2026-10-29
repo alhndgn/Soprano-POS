@@ -13,7 +13,8 @@ Pizzacı için masa/adisyon, mutfak ekranı ve kasa yönetimi. Tek sunucu, table
 - **Detaylı ürün yönetimi:** hazırlanış metni, boyutlar, içindekiler, seçenek grupları, görsel
 - **İçindekiler siparişte:** malzemeyi çıkar/ekle (ekstralar fiyatlı), mutfağa `ÇIKAR/EKLE` olarak gider
 - **Menü görselleri:** ürün fotoğrafı yükle, sipariş kartlarında görünsün
-- **Açık tema:** beyaz zemin + kırmızı vurgu, tablette yüksek kontrast
+- **Açık tema:** sıcak beyaz yüzeyler + tomato red vurgu, tablette yüksek kontrast
+- **Premium UI/UX:** operasyonel sidebar, KPI başlıkları, canlı servis paneli, KDS tek sipariş kartı, responsive POS
 - **Adisyon iptali:** yanlış açılan adisyonu yönetici iptal eder
 
 ## Hızlı başlangıç

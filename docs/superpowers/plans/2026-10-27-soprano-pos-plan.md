@@ -64,6 +64,17 @@
 - [x] `Ek Malzeme` grubu ile içerik ekstraları tekilleştirildi
 - [x] 13 birim testi, 20 ürün + 16 yerleşim e2e doğrulaması, UI’dan kaydetme testi
 
+## Faz 8 — Kapsamlı UI/UX redesign (tamam)
+- [x] Uygulama kabuğu: geniş masaüstü sidebar, vardiya bağlamı, rol bazlı nav, skip link, focus görünümü
+- [x] Ortak görsel sistem: sıcak beyaz zemin, tomato red aksiyon, nötr yüzeyler, erişilebilir durum renkleri, reduced-motion
+- [x] Masa ekranı: KPI başlığı, canlı servis paneli, masa durumu lejandı, daha net boş/dolu ayrımı
+- [x] POS: kategori raili, ürün kartlarında açık `+ Ekle` affordance, satır toplamı + birim fiyat ayrımı, responsive sepet
+- [x] KDS: sipariş başına tek kart; farklı satır durumları kart içinde etiketlenir, aynı sipariş iki kolonda tekrarlanmaz
+- [x] Yönetim, rapor ve vardiya: ortak başlık/kicker/tabs/panel hiyerarşisi
+- [x] Erişilebilirlik: native button/label, aria isimleri, role/alert/live bölgeleri, keyboard PIN girişi, mobil düzen
+- [x] Tarayıcı doğrulaması: masa, POS, KDS, rapor, yönetim ekranları; desktop 1440px + mobile 820px
+- [x] Temiz veritabanı e2e sırasında bulunan schema sırası hatası düzeltildi (`line_ingredients` artık `order_lines` sonrasında)
+
 ## Sonraki sürüm (v0.2)
 1. **Paket servis**: müşteri/adres defteri, bölge, kurye ataması, teslim durumu
 2. **QR menü / online sipariş**: mevcut WordPress kurulumuna bağlanır
