@@ -139,7 +139,18 @@ CREATE TABLE IF NOT EXISTS orders (
   closed_at    timestamptz
 );
 
-CREATE INDEX IF NOT EXISTS orders_open_idx ON orders(status, table_id);
+-- Ödeme/denetim snapshot'ları: mevcut kurulumlarda idempotent migration.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_name text;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_type text NOT NULL DEFAULT 'none';
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_value integer NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount integer NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS discounted_by integer REFERENCES users(id);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS discounted_at timestamptz;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS void_reason text;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS voided_by integer REFERENCES users(id);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS voided_at timestamptz;
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_discount_type_check;
+ALTER TABLE orders ADD CONSTRAINT orders_discount_type_check CHECK (discount_type IN ('none','percent','fixed'));
 
 -- Bir adisyon aynı masada birden fazla açık olamaz
 CREATE UNIQUE INDEX IF NOT EXISTS orders_one_open_per_table
@@ -195,6 +206,27 @@ CREATE TABLE IF NOT EXISTS payments (
   taken_by    integer NOT NULL REFERENCES users(id),
   created_at  timestamptz NOT NULL DEFAULT now()
 );
+
+-- Eski ödeme kayıtlarını bozmadan tendered/change bilgisi ekle.
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS tendered integer;
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS change_amount integer;
+UPDATE payments SET tendered = amount WHERE tendered IS NULL;
+UPDATE payments SET change_amount = 0 WHERE change_amount IS NULL;
+ALTER TABLE payments ALTER COLUMN tendered SET DEFAULT 0;
+ALTER TABLE payments ALTER COLUMN change_amount SET DEFAULT 0;
+ALTER TABLE payments ALTER COLUMN tendered SET NOT NULL;
+ALTER TABLE payments ALTER COLUMN change_amount SET NOT NULL;
+
+CREATE TABLE IF NOT EXISTS payment_allocations (
+  id          serial PRIMARY KEY,
+  payment_id  integer NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
+  line_id     integer NOT NULL REFERENCES order_lines(id),
+  qty         integer NOT NULL CHECK (qty > 0),
+  amount      integer NOT NULL CHECK (amount > 0)
+);
+
+CREATE INDEX IF NOT EXISTS payment_allocations_line_idx ON payment_allocations(line_id);
+CREATE INDEX IF NOT EXISTS payment_allocations_payment_idx ON payment_allocations(payment_id);
 
 CREATE TABLE IF NOT EXISTS print_jobs (
   id          serial PRIMARY KEY,
