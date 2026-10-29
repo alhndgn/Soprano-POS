@@ -1099,6 +1099,13 @@ small { font-size: 12px; }
 
 [data-theme='dark'] .input::placeholder,
 [data-theme='dark'] .textarea::placeholder { color: var(--dim); }
+[data-theme='dark'] .btn:not(.primary):not(.danger):not(.success) { background-color: var(--panel-2); border-color: var(--line-strong); color: var(--text); }
+[data-theme='dark'] .btn.ghost { background-color: transparent; border-color: transparent; color: var(--muted); }
+[data-theme='dark'] .btn.ghost:hover { background-color: #202731; color: var(--text); }
+[data-theme='dark'] .btn.danger { background-color: var(--danger-soft); border-color: #6b3030; color: var(--danger); }
+[data-theme='dark'] .btn.success { background-color: var(--ok-soft); border-color: var(--ok-line); color: var(--ok); }
+[data-theme='dark'] .switch { background-color: var(--panel-2); border-color: var(--line-strong); color: var(--muted); }
+[data-theme='dark'] .switch.on { background-color: var(--ok-soft); border-color: var(--ok-line); color: var(--ok); }
 [data-theme='dark'] .nav-item:hover,
 [data-theme='dark'] .cat-btn:hover,
 [data-theme='dark'] .chip:hover,
