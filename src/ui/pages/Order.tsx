@@ -26,9 +26,10 @@ export default function OrderPage() {
   const [order, setOrder] = useState<Order | null>(null)
   const [catId, setCatId] = useState<number | null>(null)
   const [sheet, setSheet] = useState<SheetState | null>(null)
+  const [infoProduct, setInfoProduct] = useState<Product | null>(null)
   const [payOpen, setPayOpen] = useState(false)
+  const [successFx, setSuccessFx] = useState(false)
   const [voidOpen, setVoidOpen] = useState(false)
-  const [moveOpen, setMoveOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [descOpen, setDescOpen] = useState(false)
@@ -168,31 +169,49 @@ export default function OrderPage() {
           {(activeCat?.products ?? []).map((p) => {
             const min = Math.min(...p.variants.map((v) => v.price))
             return (
-              <button
-                type="button"
-                key={p.id}
-                className="product-card"
-                aria-label={`${p.name}, ${money(min)}'den başlayan fiyat`}
-                onClick={() => pickProduct(p)}
-                disabled={busy}
-              >
-                {p.imageUrl ? (
-                  <img className="product-img" src={p.imageUrl} alt={p.name} loading="eager" decoding="async" />
-                ) : (
-                  <div className="product-img placeholder">{activeCat?.emoji ?? '🍽'}</div>
+              <div className="product-card-wrap" key={p.id}>
+                <button
+                  type="button"
+                  className="product-card"
+                  aria-label={`${p.name}, ${money(min)}'den başlayan fiyat`}
+                  onClick={() => pickProduct(p)}
+                  disabled={busy}
+                >
+                  {p.imageUrl ? (
+                    <img className="product-img" src={p.imageUrl} alt={p.name} loading="eager" decoding="async" />
+                  ) : (
+                    <div className="product-img placeholder">{activeCat?.emoji ?? '🍽'}</div>
+                  )}
+                  <div className="product-body">
+                    <div className="product-name">{p.name}</div>
+                    <div className="product-hint">
+                      {p.variants.length > 1 ? `${p.variants.length} boy` : p.variants[0]?.name}
+                      {p.groups.length ? ` · ${p.groups.length} seçenek` : ''}
+                    </div>
+                    <div className="product-price">
+                      <span>{money(min)}</span>
+                      <span className="product-add">+ Ekle</span>
+                    </div>
+                  </div>
+                </button>
+                {p.description && (
+                  <button
+                    type="button"
+                    className="product-info-button"
+                    aria-label={`${p.name} hazırlanışını göster`}
+                    title="Hazırlanışı göster"
+                    onClick={() => setInfoProduct(p)}
+                  >
+                    ?
+                  </button>
                 )}
-                <div className="product-body">
-                  <div className="product-name">{p.name}</div>
-                  <div className="product-hint">
-                    {p.variants.length > 1 ? `${p.variants.length} boy` : p.variants[0]?.name}
-                    {p.groups.length ? ` · ${p.groups.length} seçenek` : ''}
+                {infoProduct?.id === p.id && (
+                  <div className="product-info-popover" role="dialog" aria-label={`${p.name} hazırlanışı`}>
+                    <div className="product-info-head"><b>Nasıl hazırlanır?</b><button type="button" onClick={() => setInfoProduct(null)} aria-label="Bilgiyi kapat">×</button></div>
+                    <p>{p.description}</p>
                   </div>
-                  <div className="product-price">
-                    <span>{money(min)}</span>
-                    <span className="product-add">+ Ekle</span>
-                  </div>
-                </div>
-              </button>
+                )}
+              </div>
             )
           })}
         </div>
@@ -276,9 +295,6 @@ export default function OrderPage() {
               Ödeme Al
             </button>
           </div>
-          <button className="btn ghost sm block" style={{ marginTop: 9 }} onClick={() => setMoveOpen(true)}>
-            Masa Taşı
-          </button>
         </div>
       </div>
 
@@ -438,9 +454,13 @@ export default function OrderPage() {
           onSubmit={(payload) => api.pay(orderId, payload)}
           onDone={async (result) => {
             if (result.status === 'paid') {
+              setSuccessFx(true)
               await refresh()
-              setPayOpen(false)
-              navigate('/tables')
+              window.setTimeout(() => {
+                setSuccessFx(false)
+                setPayOpen(false)
+                navigate('/tables')
+              }, 700)
             } else {
               await load()
             }
@@ -462,35 +482,11 @@ export default function OrderPage() {
         />
       )}
 
-      {moveOpen && (
-        <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && setMoveOpen(false)}>
-          <div className="modal">
-            <h3>Masa Taşı</h3>
-            <div className="sub">Adisyonu taşımak istediğin masayı seç</div>
-            <div className="mod-chips">
-              {(boot?.floors ?? []).flatMap((f) =>
-                f.tables
-                  .filter((t) => t.id !== order.table_id && !t.order)
-                  .map((t) => (
-                    <button
-                      key={t.id}
-                      className="chip"
-                      onClick={async () => {
-                        await doAction(() => api.move(orderId, t.id))
-                        setMoveOpen(false)
-                      }}
-                    >
-                      {t.name}
-                    </button>
-                  )),
-              )}
-            </div>
-            <div className="modal-actions">
-              <button className="btn" onClick={() => setMoveOpen(false)}>
-                Vazgeç
-              </button>
-            </div>
-          </div>
+      {successFx && (
+        <div className="payment-success-overlay" role="status" aria-live="polite">
+          <div className="payment-success-mark">✓</div>
+          <b>Ödeme alındı</b>
+          <span>Adisyon kapatıldı</span>
         </div>
       )}
     </div>

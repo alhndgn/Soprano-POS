@@ -185,6 +185,7 @@ export default function App() {
 
         <main className="main" id="main-content" tabIndex={-1}>
           {error && <div className="toast error" role="alert">{error}</div>}
+          <div className="route-stage" key={location.pathname}>
           <Routes>
             <Route path="/tables" element={<Tables />} />
             <Route path="/order/:id" element={<OrderPage />} />
@@ -194,6 +195,7 @@ export default function App() {
             <Route path="/shift" element={<Shift />} />
             <Route path="*" element={<Navigate to="/tables" replace />} />
           </Routes>
+          </div>
         </main>
       </div>
     </AppCtx.Provider>

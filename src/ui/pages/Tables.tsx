@@ -19,6 +19,8 @@ export default function Tables() {
   const navigate = useNavigate()
   const [floorId, setFloorId] = useState<number | null>(null)
   const [busy, setBusy] = useState<number | null>(null)
+  const [moveOpen, setMoveOpen] = useState<{ orderId: number; tableId: number; tableName: string } | null>(null)
+  const [moving, setMoving] = useState(false)
 
   const floors = boot?.floors ?? []
   const active = floors.find((f) => f.id === floorId) ?? floors[0]
@@ -51,6 +53,18 @@ export default function Tables() {
       navigate(`/order/${res.id}`)
     } finally {
       setBusy(null)
+    }
+  }
+
+  const moveTo = async (tableId: number) => {
+    if (!moveOpen || moving) return
+    setMoving(true)
+    try {
+      await api.move(moveOpen.orderId, tableId)
+      await refresh()
+      setMoveOpen(null)
+    } finally {
+      setMoving(false)
     }
   }
 
@@ -158,20 +172,31 @@ export default function Tables() {
           <div className="side-list">
             {openOrders.length === 0 && <div className="kds-empty">Açık adisyon yok</div>}
             {openOrders.map((t) => (
-              <button key={t.id} className="open-row" onClick={() => navigate(`/order/${t.order!.id}`)}>
-                <div className="open-row-main">
-                  <b>{t.name}</b>
-                  <small>
-                    {t.floor} · {t.order!.guest_count} kişi · {elapsed(t.order!.opened_at)}
-                  </small>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div className="open-row-total">{money(t.order!.total)}</div>
-                  <small style={{ color: t.order!.sent_lines ? 'var(--ok)' : 'var(--accent-2)' }}>
-                    {t.order!.sent_lines ? 'mutfakta' : 'gönderilmedi'}
-                  </small>
-                </div>
-              </button>
+              <div key={t.id} className="open-row">
+                <button className="open-row-main" onClick={() => navigate(`/order/${t.order!.id}`)}>
+                  <div>
+                    <b>{t.name}</b>
+                    <small>
+                      {t.floor} · {t.order!.guest_count} kişi · {elapsed(t.order!.opened_at)}
+                    </small>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div className="open-row-total">{money(t.order!.total)}</div>
+                    <small style={{ color: t.order!.sent_lines ? 'var(--ok)' : 'var(--accent-2)' }}>
+                      {t.order!.sent_lines ? 'mutfakta' : 'gönderilmedi'}
+                    </small>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  className="open-row-move"
+                  aria-label={`${t.name} adisyonunu taşı`}
+                  title="Adisyonu başka masaya taşı"
+                  onClick={() => setMoveOpen({ orderId: t.order!.id, tableId: t.id, tableName: t.name })}
+                >
+                  ↔
+                </button>
+              </div>
             ))}
           </div>
           <div className="side-total">
@@ -180,6 +205,31 @@ export default function Tables() {
           </div>
         </aside>
       </div>
+
+      {moveOpen && (
+        <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && setMoveOpen(null)}>
+          <div className="modal table-move-modal" role="dialog" aria-modal="true" aria-label="Adisyonu masa taşı">
+            <p className="eyebrow">MASA İŞLEMİ</p>
+            <h3>{moveOpen.tableName} adisyonunu taşı</h3>
+            <div className="sub">Boş bir masa seç</div>
+            <div className="move-table-grid">
+              {floors.flatMap((floor) =>
+                floor.tables
+                  .filter((table) => table.id !== moveOpen.tableId && !table.order)
+                  .map((table) => (
+                    <button type="button" className="move-table-choice" key={table.id} disabled={moving} onClick={() => void moveTo(table.id)}>
+                      <b>{table.name}</b>
+                      <small>{floor.name} · {table.seats} kişilik</small>
+                    </button>
+                  )),
+              )}
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn" onClick={() => setMoveOpen(null)} disabled={moving}>Vazgeç</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
