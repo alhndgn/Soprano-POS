@@ -20,6 +20,11 @@ const GS = 0x1d
 
 class EscPos {
   bytes: number[] = []
+  width: number
+
+  constructor(width = 42) {
+    this.width = width
+  }
 
   raw(...b: number[]) { this.bytes.push(...b); return this }
   init() { return this.raw(ESC, 0x40) }
@@ -38,14 +43,15 @@ class EscPos {
     return this.raw(0x0a)
   }
 
-  line(ch = '-', width = 42) { return this.text(ch.repeat(width)) }
-  row(left: string, right: string, width = 42) {
-    const pad = Math.max(1, width - left.length - right.length)
+  line(ch = '-') { return this.text(ch.repeat(this.width)) }
+  row(left: string, right: string) {
+    const pad = Math.max(1, this.width - left.length - right.length)
     return this.text(left + ' '.repeat(pad) + right)
   }
 }
 
-const W = 42 // 80mm kağıt, font A
+/** Kağıt genişliğine göre karakter sayısı: 80 mm → 42, 58 mm → 32. */
+export const charsForPaper = (paperWidth = 80) => (Number(paperWidth) === 58 ? 32 : 42)
 
 export type ReceiptPayload = {
   outletName: string
@@ -87,8 +93,8 @@ export type KotPayload = {
 
 const tl = (k: number) => `${(Math.floor(k / 100)).toLocaleString('tr-TR')},${String(k % 100).padStart(2, '0')}`
 
-export function buildReceipt(p: ReceiptPayload): Buffer {
-  const e = new EscPos().init().align('center')
+export function buildReceipt(p: ReceiptPayload, paperWidth = 80): Buffer {
+  const e = new EscPos(charsForPaper(paperWidth)).init().align('center')
   e.bold(true).double(true).text(p.outletName).double(false).bold(false)
   e.text(`Adisyon #${p.orderId}`)
   e.text(`${p.tableName} · ${p.staffName}`)
@@ -114,8 +120,8 @@ export function buildReceipt(p: ReceiptPayload): Buffer {
   return Buffer.from(e.bytes)
 }
 
-export function buildKot(p: KotPayload): Buffer {
-  const e = new EscPos().init()
+export function buildKot(p: KotPayload, paperWidth = 80): Buffer {
+  const e = new EscPos(charsForPaper(paperWidth)).init()
   e.bold(true).double(true).text(`MUTFAK #${p.orderId}`).double(false).bold(false)
   e.text(p.tableName)
   e.text(new Date(p.timeISO).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }))

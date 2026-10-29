@@ -35,6 +35,7 @@ echo   Kapatmak icin: Ctrl+C, sonra bu pencereyi kapat.
 echo ============================================
 echo.
 
+start "Soprano Yazici" /min cmd /c "npm run bridge"
 start "" cmd /c "timeout /t 6 /nobreak >nul & start http://localhost:8095"
 npm start
 pause

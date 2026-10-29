@@ -4,7 +4,13 @@ import { createWriteStream } from 'node:fs'
 import { mkdir, unlink } from 'node:fs/promises'
 import { pipeline } from 'node:stream/promises'
 import path from 'node:path'
+import os from 'node:os'
+import net from 'node:net'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import { db } from './db/client.ts'
+import { charsForPaper } from './print/escpos.ts'
+import { describePrinter, normalizePrinter, type PrinterConfig } from './print/routing.ts'
 import { hashPin, loginWithPin, logout, requireRole, userForToken, type AuthUser } from './auth.ts'
 import {
   allocateDiscount,
@@ -16,6 +22,22 @@ import {
   type PaymentDueLine,
   type PricedLine,
 } from './money.ts'
+
+/** Tüm yazıcı tanımları (rol sırasıyla). */
+const listPrinters = () => db.all<PrinterConfig>(`SELECT * FROM printers ORDER BY device, id`)
+
+/** Bu rol için aktif yazıcı var mı? Yoksa iş kuyruğa hiç girmez. */
+async function hasPrinter(device: 'receipt' | 'kitchen'): Promise<boolean> {
+  const row = await db.one(`SELECT 1 AS ok FROM printers WHERE device=$1 AND enabled LIMIT 1`, [device])
+  return Boolean(row)
+}
+
+/** HTTP hata yardımcısı: setErrorHandler statusCode'a bakar. */
+function httpError(status: number, message: string) {
+  const err: any = new Error(message)
+  err.statusCode = status
+  return err
+}
 
 // ---------- SSE yayını ----------
 const subscribers = new Set<any>()
@@ -452,7 +474,7 @@ export async function registerRoutes(app: FastifyInstance) {
       if (!newLines.length) return order
 
       await db.all(`UPDATE order_lines SET status='sent', sent_at=now() WHERE order_id=$1 AND status='new'`, [id])
-      await db.one(
+      if (await hasPrinter('kitchen')) await db.one(
         `INSERT INTO print_jobs (kind, device, order_id, payload) VALUES ('kot','kitchen',$1,$2) RETURNING id`,
         [
           id,
@@ -658,7 +680,8 @@ export async function registerRoutes(app: FastifyInstance) {
           [nextStatus, id],
         )
         if (nextStatus === 'paid') {
-          await tx.one(
+          const receiptPrinter = await tx.one(`SELECT 1 AS ok FROM printers WHERE device='receipt' AND enabled LIMIT 1`)
+          if (receiptPrinter) await tx.one(
             `INSERT INTO print_jobs (kind, device, order_id, payload) VALUES ('receipt','receipt',$1,$2) RETURNING id`,
             [
               id,
@@ -1388,6 +1411,162 @@ export async function registerRoutes(app: FastifyInstance) {
     })
   })
 
+  await app.register(async (scope) => {
+    scope.addHook('preHandler', authHook)
+
+    // ---------- yazıcılar ----------
+    const printerBody = z.object({
+      name: z.string().trim().min(1).max(60),
+      device: z.enum(['receipt', 'kitchen']),
+      transport: z.enum(['network', 'windows', 'file']),
+      address: z.string().trim().min(1).max(200),
+      paperWidth: z.union([z.literal(58), z.literal(80)]),
+      enabled: z.boolean().default(true),
+    })
+
+    scope.get('/api/admin/printers', async (req) => {
+      requireRole(user(req), ['manager', 'cashier'])
+      const printers = await listPrinters()
+      const bridge = (await db.one<any>(`SELECT value FROM settings WHERE key='bridge'`))?.value ?? null
+      const jobs = await db.all<any>(
+        `SELECT id, kind, device, status, error, printer_name, attempts, created_at
+         FROM print_jobs ORDER BY id DESC LIMIT 12`,
+      )
+      return {
+        printers: printers.map((p) => ({ ...p, summary: describePrinter(p), chars: charsForPaper(p.paper_width) })),
+        bridge,
+        jobs,
+      }
+    })
+
+    scope.post('/api/admin/printers', async (req) => {
+      requireRole(user(req), ['manager'])
+      const input = printerBody.parse(req.body)
+      let row: ReturnType<typeof normalizePrinter>
+      try {
+        row = normalizePrinter(input)
+      } catch (e: any) {
+        throw httpError(400, e.message)
+      }
+      const saved = await db.tx(async (tx) => {
+        if (row.enabled) await tx.run(`UPDATE printers SET enabled=false, updated_at=now() WHERE device=$1`, [row.device])
+        return tx.one<PrinterConfig>(
+          `INSERT INTO printers (name, device, transport, address, paper_width, enabled)
+           VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+          [row.name, row.device, row.transport, row.address, row.paper_width, row.enabled],
+        )
+      })
+      broadcast()
+      return { printer: saved ? { ...saved, summary: describePrinter(saved), chars: charsForPaper(saved.paper_width) } : saved }
+    })
+
+    scope.patch('/api/admin/printers/:id', async (req) => {
+      requireRole(user(req), ['manager'])
+      const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
+      const input = printerBody.partial().parse(req.body)
+      const existing = await db.one<PrinterConfig>(`SELECT * FROM printers WHERE id=$1`, [id])
+      if (!existing) throw httpError(404, 'Yazıcı bulunamadı')
+      const merged = {
+        name: input.name ?? existing.name,
+        device: input.device ?? existing.device,
+        transport: input.transport ?? existing.transport,
+        address: input.address ?? existing.address,
+        paperWidth: input.paperWidth ?? existing.paper_width,
+        enabled: input.enabled ?? existing.enabled,
+      }
+      let row: ReturnType<typeof normalizePrinter>
+      try {
+        row = normalizePrinter(merged as any)
+      } catch (e: any) {
+        throw httpError(400, e.message)
+      }
+      const saved = await db.tx(async (tx) => {
+        if (row.enabled) {
+          await tx.run(`UPDATE printers SET enabled=false, updated_at=now() WHERE device=$1 AND id<>$2`, [row.device, id])
+        }
+        return tx.one<PrinterConfig>(
+          `UPDATE printers SET name=$1, device=$2, transport=$3, address=$4, paper_width=$5, enabled=$6, updated_at=now()
+           WHERE id=$7 RETURNING *`,
+          [row.name, row.device, row.transport, row.address, row.paper_width, row.enabled, id],
+        )
+      })
+      broadcast()
+      return { printer: saved ? { ...saved, summary: describePrinter(saved), chars: charsForPaper(saved.paper_width) } : saved }
+    })
+
+    scope.delete('/api/admin/printers/:id', async (req) => {
+      requireRole(user(req), ['manager'])
+      const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
+      await db.run(`DELETE FROM printers WHERE id=$1`, [id])
+      broadcast()
+      return { ok: true }
+    })
+
+    /** Örnek fiş/KOT kuyruğa atar; köprü çalışıyorsa hemen basar. */
+    scope.post('/api/admin/printers/:id/test', async (req) => {
+      requireRole(user(req), ['manager'])
+      const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
+      const printer = await db.one<PrinterConfig>(`SELECT * FROM printers WHERE id=$1`, [id])
+      if (!printer) throw httpError(404, 'Yazıcı bulunamadı')
+      const now = new Date().toISOString()
+      const kind = printer.device === 'kitchen' ? 'kot' : 'receipt'
+      const payload = kind === 'kot'
+        ? {
+            orderId: 0,
+            tableName: 'TEST',
+            staffName: user(req).name,
+            timeISO: now,
+            lines: [{ name: 'Test urunu', qty: 1, modifiers: [], removed: [], added: [] }],
+          }
+        : {
+            outletName: (await db.one<any>(`SELECT value FROM settings WHERE key='outlet'`))?.value?.name ?? 'Soprano',
+            orderId: 0,
+            tableName: 'TEST',
+            staffName: user(req).name,
+            dateISO: now,
+            lines: [{ name: 'Test urunu', qty: 1, unitPrice: 10000, modifiers: [], total: 10000 }],
+            subtotal: 10000,
+            vatLines: [{ rate: 10, vat: 909, gross: 10000 }],
+            total: 10000,
+            payments: [{ method: 'cash', amount: 10000 }],
+            change: 0,
+            footer: 'TEST FISI — Soprano POS',
+          }
+      const job = await db.one<any>(
+        `INSERT INTO print_jobs (kind, device, payload) VALUES ($1,$2,$3) RETURNING id, created_at`,
+        [kind, printer.device, JSON.stringify(payload)],
+      )
+      return { job, printer: { ...printer, summary: describePrinter(printer) } }
+    })
+
+    /** Kurulu Windows yazıcılarını listeler (sunucu Windows'ta çalışıyorsa). */
+    scope.get('/api/admin/printers/detect', async (req) => {
+      requireRole(user(req), ['manager'])
+      const { mode } = z.object({ mode: z.enum(['windows', 'network']).default('windows') }).parse(req.query)
+      if (mode === 'network') return { mode, candidates: await scanLanPrinters() }
+      if (process.platform !== 'win32') return { mode, available: false, printers: [], reason: 'Sunucu Windows değil' }
+      try {
+        const { stdout } = await promisify(execFile)(
+          'powershell.exe',
+          ['-NoProfile', '-NonInteractive', '-Command',
+            'Get-Printer | Select-Object Name,DriverName,PortName,PrinterStatus | ConvertTo-Json -Compress'],
+          { timeout: 12000, windowsHide: true },
+        )
+        const raw = stdout.trim()
+        const parsed = raw ? JSON.parse(raw) : []
+        const printers = (Array.isArray(parsed) ? parsed : [parsed]).map((p: any) => ({
+          name: String(p.Name ?? ''),
+          driver: String(p.DriverName ?? ''),
+          port: String(p.PortName ?? ''),
+          status: String(p.PrinterStatus ?? ''),
+        }))
+        return { mode, available: true, printers }
+      } catch (err: any) {
+        return { mode, available: false, printers: [], reason: String(err.message ?? err).slice(0, 200) }
+      }
+    })
+  })
+
   // ---------- yazıcı köprüsü (LAN; BRIDGE_TOKEN verilirse zorunlu) ----------
   const bridgeGuard = async (req: FastifyRequest, reply: FastifyReply) => {
     const expected = process.env.BRIDGE_TOKEN
@@ -1395,20 +1574,106 @@ export async function registerRoutes(app: FastifyInstance) {
     if (req.headers['x-bridge-token'] !== expected) return reply.code(401).send({ error: 'Köprü token hatalı' })
   }
 
+  app.post('/api/print/bridge/heartbeat', { preHandler: bridgeGuard }, async (req) => {
+    const value = z.object({ host: z.string().max(120).optional(), platform: z.string().max(60).optional() }).parse(req.body ?? {})
+    const status = { host: value.host ?? null, platform: value.platform ?? null, at: new Date().toISOString() }
+    await db.run(
+      `INSERT INTO settings (key, value) VALUES ('bridge', $1::jsonb)
+       ON CONFLICT (key) DO UPDATE SET value=$1::jsonb`,
+      [JSON.stringify(status)],
+    )
+    return { ok: true }
+  })
+
   app.get('/api/print/jobs', { preHandler: bridgeGuard }, async (req) => {
     const { device } = z.object({ device: z.enum(['receipt', 'kitchen']).optional() }).parse(req.query)
+    // Köprü çöktüyse 3 dakikadan eski 'printing' işleri geri al.
+    await db.run(`UPDATE print_jobs SET status='queued', claimed_at=NULL
+                  WHERE status='printing' AND claimed_at < now() - interval '3 minutes'`)
+    // İşi atomik sahiplen: aynı iş iki kez basılmasın.
     const rows = await db.all<any>(
-      `SELECT id, kind, device, payload FROM print_jobs
-       WHERE status='queued' ${device ? 'AND device=$1' : ''} ORDER BY id LIMIT 20`,
+      `UPDATE print_jobs SET status='printing', claimed_at=now()
+       WHERE id IN (
+         SELECT id FROM print_jobs WHERE status='queued' ${device ? 'AND device=$1' : ''}
+         ORDER BY id LIMIT 20
+       ) RETURNING id, kind, device, payload`,
       device ? [device] : [],
     )
-    return rows
+    const printers = await listPrinters()
+    // Her iş, rolüne tanımlı aktif yazıcıyla birlikte döner; tanımlı değilse null.
+    return rows.map((job) => {
+      const p = printers.find((x: PrinterConfig) => x.device === job.device && x.enabled)
+      return {
+        ...job,
+        printer: p
+          ? { id: p.id, name: p.name, transport: p.transport, address: p.address, paperWidth: p.paper_width }
+          : null,
+      }
+    })
   })
 
   app.post('/api/print/jobs/:id/done', { preHandler: bridgeGuard }, async (req) => {
     const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
-    const { ok, error } = z.object({ ok: z.boolean(), error: z.string().optional() }).parse(req.body)
-    await db.one(`UPDATE print_jobs SET status=$1, error=$2 WHERE id=$3 RETURNING id`, [ok ? 'printed' : 'failed', error ?? null, id])
+    const { ok, error, printerName } = z
+      .object({ ok: z.boolean(), error: z.string().optional(), printerName: z.string().max(120).nullish() })
+      .parse(req.body)
+    await db.one(
+      `UPDATE print_jobs SET status=$1, error=$2, printer_name=$3, attempts=attempts+1 WHERE id=$4 RETURNING id`,
+      [ok ? 'printed' : 'failed', error ?? null, printerName ?? null, id],
+    )
+    broadcast()
     return { ok: true }
   })
+
+  /** Başarısız işi yeniden kuyruğa alır (yazıcı düzeltildikten sonra). */
+  app.post('/api/admin/print/jobs/:id/retry', async (req) => {
+    requireRole(user(req), ['manager'])
+    const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
+    const job = await db.one<any>(`SELECT id FROM print_jobs WHERE id=$1`, [id])
+    if (!job) throw httpError(404, 'İş bulunamadı')
+    await db.run(`UPDATE print_jobs SET status='queued', error=NULL WHERE id=$1`, [id])
+    broadcast()
+    return { ok: true }
+  })
+}
+
+/** Yerel ağdaki 9100 portu açık yazıcıları tarar (LAN keşfi). */
+async function scanLanPrinters(): Promise<{ ip: string; port: number }[]> {
+  const nets = os.networkInterfaces()
+  const subnets = new Set<string>()
+  for (const list of Object.values(nets)) {
+    for (const i of list ?? []) {
+      if (i.family !== 'IPv4' || i.internal) continue
+      const parts = i.address.split('.')
+      if (parts.length === 4) subnets.add(parts.slice(0, 3).join('.'))
+    }
+  }
+  const hosts: string[] = []
+  for (const base of subnets) for (let n = 1; n <= 254; n++) hosts.push(`${base}.${n}`)
+
+  const probe = (ip: string) =>
+    new Promise<{ ip: string; port: number } | null>((resolve) => {
+      const socket = net.createConnection({ host: ip, port: 9100 })
+      const done = (ok: boolean) => {
+        socket.removeAllListeners()
+        socket.destroy()
+        resolve(ok ? { ip, port: 9100 } : null)
+      }
+      socket.setTimeout(450, () => done(false))
+      socket.once('connect', () => done(true))
+      socket.once('error', () => done(false))
+    })
+
+  const results: { ip: string; port: number }[] = []
+  const queue = [...hosts]
+  const workers = Array.from({ length: 64 }, async () => {
+    while (queue.length) {
+      const ip = queue.shift()
+      if (!ip) return
+      const hit = await probe(ip)
+      if (hit) results.push(hit)
+    }
+  })
+  await Promise.all(workers)
+  return results.sort((a, b) => a.ip.localeCompare(b.ip, 'en', { numeric: true }))
 }

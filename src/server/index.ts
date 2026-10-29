@@ -46,7 +46,9 @@ if (recipes.products > 0) app.log.info(recipes, 'ürün içerikleri/açıklamala
 
 app.setErrorHandler((err: any, req, reply) => {
   if (err instanceof ZodError) {
-    return reply.code(400).send({ error: 'Geçersiz istek', issues: err.issues })
+    const first = err.issues?.[0]
+    const detail = first ? `${first.path.join('.') || 'alan'}: ${first.message}` : ''
+    return reply.code(400).send({ error: detail ? `Geçersiz istek — ${detail}` : 'Geçersiz istek', issues: err.issues })
   }
   const status = (err as any).statusCode ?? 500
   if (status >= 500) req.log.error(err)

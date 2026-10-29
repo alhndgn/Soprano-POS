@@ -110,6 +110,40 @@ export type PaymentResult = {
   orderId: number
   status: 'open' | 'paid'
 }
+export type PrinterTransport = 'network' | 'windows' | 'file'
+export type PrinterDevice = 'receipt' | 'kitchen'
+export type Printer = {
+  id: number
+  name: string
+  device: PrinterDevice
+  transport: PrinterTransport
+  address: string
+  paper_width: number
+  enabled: boolean
+  summary: string
+  chars: number
+}
+export type PrinterInput = {
+  name: string
+  device: PrinterDevice
+  transport: PrinterTransport
+  address: string
+  paperWidth: number
+  enabled: boolean
+}
+export type PrintJob = {
+  id: number
+  kind: 'receipt' | 'kot'
+  device: PrinterDevice
+  status: 'queued' | 'printing' | 'printed' | 'failed'
+  error: string | null
+  printer_name: string | null
+  attempts: number
+  created_at: string
+}
+export type BridgeStatus = { host: string | null; platform: string | null; at: string } | null
+export type DetectedPrinter = { name: string; driver: string; port: string; status: string }
+export type LanPrinter = { ip: string; port: number }
 export type Totals = { subtotal: number; vat: number; total: number; vatLines: { rate: number; net: number; vat: number; gross: number }[] }
 export type Order = {
   id: number
@@ -322,6 +356,21 @@ export const api = {
     return data as { ok: boolean; imageUrl: string }
   },
   deleteImage: (productId: number) => request('DELETE', `/api/admin/products/${productId}/image`),
+
+  // yazıcılar
+  printers: () =>
+    request<{ printers: Printer[]; bridge: BridgeStatus; jobs: PrintJob[] }>('GET', '/api/admin/printers'),
+  createPrinter: (body: PrinterInput) => request<{ printer: Printer }>('POST', '/api/admin/printers', body),
+  updatePrinter: (id: number, body: Partial<PrinterInput>) =>
+    request<{ printer: Printer }>('PATCH', `/api/admin/printers/${id}`, body),
+  deletePrinter: (id: number) => request<{ ok: boolean }>('DELETE', `/api/admin/printers/${id}`),
+  testPrinter: (id: number) => request<{ job: { id: number }; printer: Printer }>('POST', `/api/admin/printers/${id}/test`, {}),
+  detectPrinters: (mode: 'windows' | 'network' = 'windows') =>
+    request<{ mode: string; available?: boolean; reason?: string; printers?: DetectedPrinter[]; candidates?: LanPrinter[] }>(
+      'GET',
+      `/api/admin/printers/detect?mode=${mode}`,
+    ),
+  retryPrintJob: (id: number) => request<{ ok: boolean }>('POST', `/api/admin/print/jobs/${id}/retry`, {}),
 }
 
 // ---------- biçimlendirme ----------

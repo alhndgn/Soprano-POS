@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, money, type Role } from '../api.ts'
 import LayoutEditor from '../components/LayoutEditor.tsx'
 import ProductEditor from '../components/ProductEditor.tsx'
+import PrinterSettings from '../components/PrinterSettings.tsx'
 
 type MenuRow = Awaited<ReturnType<typeof api.adminMenu>>[number]
 type StaffRow = Awaited<ReturnType<typeof api.staff>>[number]
@@ -9,7 +10,7 @@ type StaffRow = Awaited<ReturnType<typeof api.staff>>[number]
 const ROLE_LABEL: Record<Role, string> = { manager: 'Yönetici', cashier: 'Kasiyer', waiter: 'Garson' }
 
 export default function Admin() {
-  const [tab, setTab] = useState<'menu' | 'staff' | 'layout'>('layout')
+  const [tab, setTab] = useState<'menu' | 'staff' | 'layout' | 'printers'>('layout')
   const [menu, setMenu] = useState<MenuRow[]>([])
   const [staff, setStaff] = useState<StaffRow[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -70,7 +71,7 @@ export default function Admin() {
         <div>
           <p className="eyebrow">AYARLAR VE MENÜ</p>
           <h1>Yönetim</h1>
-          <div className="sub">Masa düzeni · menü ve görseller · personel</div>
+          <div className="sub">Masa düzeni · menü ve görseller · personel · yazıcılar</div>
         </div>
       </div>
 
@@ -87,9 +88,14 @@ export default function Admin() {
         <button type="button" role="tab" aria-selected={tab === 'staff'} className={`tab${tab === 'staff' ? ' on' : ''}`} onClick={() => setTab('staff')}>
           Personel ({staff.length})
         </button>
+        <button type="button" role="tab" aria-selected={tab === 'printers'} className={`tab${tab === 'printers' ? ' on' : ''}`} onClick={() => setTab('printers')}>
+          Yazıcılar
+        </button>
       </div>
 
       {tab === 'layout' && <LayoutEditor onError={setError} />}
+
+      {tab === 'printers' && <PrinterSettings onError={setError} onOk={setOk} />}
 
       {tab === 'menu' && (
         <div className="panel">

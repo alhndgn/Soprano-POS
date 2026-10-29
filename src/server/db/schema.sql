@@ -245,3 +245,25 @@ CREATE TABLE IF NOT EXISTS settings (
   key    text PRIMARY KEY,
   value  jsonb NOT NULL
 );
+
+-- Yazıcı tanımları: her rol (kasa fişi / mutfak KOT) için tek aktif yazıcı.
+CREATE TABLE IF NOT EXISTS printers (
+  id          serial PRIMARY KEY,
+  name        text NOT NULL,
+  device      text NOT NULL CHECK (device IN ('receipt','kitchen')),
+  transport   text NOT NULL CHECK (transport IN ('network','windows','file')),
+  address     text NOT NULL,
+  paper_width integer NOT NULL DEFAULT 80 CHECK (paper_width IN (58,80)),
+  enabled     boolean NOT NULL DEFAULT true,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS printers_device_idx ON printers(device) WHERE enabled = true;
+
+ALTER TABLE print_jobs ADD COLUMN IF NOT EXISTS printer_name text;
+ALTER TABLE print_jobs ADD COLUMN IF NOT EXISTS attempts integer NOT NULL DEFAULT 0;
+ALTER TABLE print_jobs ADD COLUMN IF NOT EXISTS claimed_at timestamptz;
+ALTER TABLE print_jobs DROP CONSTRAINT IF EXISTS print_jobs_status_check;
+ALTER TABLE print_jobs ADD CONSTRAINT print_jobs_status_check
+  CHECK (status IN ('queued','printing','printed','failed'));
