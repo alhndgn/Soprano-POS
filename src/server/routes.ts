@@ -642,6 +642,124 @@ export async function registerRoutes(app: FastifyInstance) {
       }))
     })
 
+    const groupBody = z.object({
+      name: z.string().min(1).max(40),
+      min: z.number().int().min(0).max(20).default(0),
+      max: z.number().int().min(1).max(30).default(1),
+      modifiers: z
+        .array(
+          z.object({
+            id: z.number().int().optional(),
+            name: z.string().min(1).max(40),
+            price: z.number().int().min(0).max(1_000_000),
+          }),
+        )
+        .max(40)
+        .default([]),
+    })
+
+    const checkGroup = (body: z.infer<typeof groupBody>) => {
+      if (body.max < body.min) {
+        const e: any = new Error('En fazla seçim, en az seçimden küçük olamaz')
+        e.statusCode = 400
+        throw e
+      }
+      if (body.min > body.modifiers.length) {
+        const e: any = new Error('Zorunlu seçim sayısı seçenek sayısından fazla olamaz')
+        e.statusCode = 400
+        throw e
+      }
+    }
+
+    scope.post('/api/admin/modifier-groups', async (req) => {
+      requireRole(user(req), ['manager'])
+      const body = groupBody.parse(req.body)
+      checkGroup(body)
+      return db.tx(async (tx) => {
+        const group = await tx.one<any>(
+          `INSERT INTO modifier_groups (name, min_sel, max_sel, sort)
+           VALUES ($1,$2,$3,(SELECT COALESCE(MAX(sort),0)+1 FROM modifier_groups)) RETURNING id`,
+          [body.name, body.min, body.max],
+        )
+        let sort = 0
+        for (const m of body.modifiers) {
+          await tx.one(`INSERT INTO modifiers (group_id, name, price, sort) VALUES ($1,$2,$3,$4) RETURNING id`, [
+            group!.id,
+            m.name,
+            m.price,
+            sort++,
+          ])
+        }
+        broadcast()
+        return { id: group!.id }
+      })
+    })
+
+    scope.put('/api/admin/modifier-groups/:id', async (req) => {
+      requireRole(user(req), ['manager'])
+      const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
+      const body = groupBody.parse(req.body)
+      checkGroup(body)
+      const group = await db.one<any>(`SELECT id FROM modifier_groups WHERE id=$1`, [id])
+      if (!group) {
+        const e: any = new Error('Seçenek grubu bulunamadı')
+        e.statusCode = 404
+        throw e
+      }
+      return db.tx(async (tx) => {
+        await tx.one(`UPDATE modifier_groups SET name=$1, min_sel=$2, max_sel=$3 WHERE id=$4 RETURNING id`, [
+          body.name,
+          body.min,
+          body.max,
+          id,
+        ])
+        const kept: number[] = []
+        let sort = 0
+        for (const m of body.modifiers) {
+          if (m.id) {
+            const row = await tx.one<any>(
+              `UPDATE modifiers SET name=$1, price=$2, sort=$3, active=true WHERE id=$4 AND group_id=$5 RETURNING id`,
+              [m.name, m.price, sort++, m.id, id],
+            )
+            if (row) kept.push(row.id)
+          } else {
+            const row = await tx.one<any>(
+              `INSERT INTO modifiers (group_id, name, price, sort) VALUES ($1,$2,$3,$4) RETURNING id`,
+              [id, m.name, m.price, sort++],
+            )
+            kept.push(row!.id)
+          }
+        }
+        // Geçmiş adisyonlar bozulmasın diye silmiyoruz, pasife alıyoruz.
+        const existing = await tx.all<{ id: number }>(`SELECT id FROM modifiers WHERE group_id=$1 AND active=true`, [id])
+        for (const row of existing) {
+          if (!kept.includes(row.id)) {
+            await tx.one(`UPDATE modifiers SET active=false WHERE id=$1 RETURNING id`, [row.id])
+          }
+        }
+        broadcast()
+        return { ok: true }
+      })
+    })
+
+    scope.delete('/api/admin/modifier-groups/:id', async (req) => {
+      requireRole(user(req), ['manager'])
+      const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
+      const used = await db.one<any>(
+        `SELECT count(*)::int AS c FROM line_modifiers lm
+         JOIN modifiers m ON m.id = lm.modifier_id WHERE m.group_id=$1`,
+        [id],
+      )
+      if ((used?.c ?? 0) > 0) {
+        const e: any = new Error('Bu grup geçmiş adisyonlarda kullanıldığı için silinemez. Seçeneklerini pasife alabilirsin.')
+        e.statusCode = 409
+        throw e
+      }
+      await db.one(`DELETE FROM modifier_groups WHERE id=$1 RETURNING id`, [id])
+      broadcast()
+      return { ok: true }
+    })
+
     // ---------- ürün yönetimi (detaylı) ----------
     const productBody = z.object({
       name: z.string().min(1).max(80),

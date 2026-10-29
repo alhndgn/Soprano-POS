@@ -13,6 +13,7 @@ export default function Admin() {
   const [menu, setMenu] = useState<MenuRow[]>([])
   const [staff, setStaff] = useState<StaffRow[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [ok, setOk] = useState<string | null>(null)
   const [form, setForm] = useState({ name: '', role: 'waiter' as Role, pin: '' })
   const [uploading, setUploading] = useState<number | null>(null)
   const [editor, setEditor] = useState<{ open: boolean; id: number | null }>({ open: false, id: null })
@@ -23,6 +24,12 @@ export default function Admin() {
   }
 
   useEffect(load, [])
+
+  useEffect(() => {
+    if (!ok) return
+    const timer = setTimeout(() => setOk(null), 2800)
+    return () => clearTimeout(timer)
+  }, [ok])
 
   const upload = async (id: number, file?: File | null) => {
     if (!file) return
@@ -68,6 +75,7 @@ export default function Admin() {
       </div>
 
       {error && <div className="toast error" role="alert">{error}</div>}
+      {ok && !error && <div className="toast ok" role="status">{ok}</div>}
 
       <div className="tabs" role="tablist" aria-label="Yönetim bölümleri">
         <button type="button" role="tab" aria-selected={tab === 'layout'} className={`tab${tab === 'layout' ? ' on' : ''}`} onClick={() => setTab('layout')}>
@@ -164,8 +172,8 @@ export default function Admin() {
           onClose={() => setEditor({ open: false, id: null })}
           onSaved={(msg) => {
             setError(null)
+            setOk(msg)
             load()
-            console.info(msg)
           }}
           onError={setError}
           onCategoriesChanged={load}

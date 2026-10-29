@@ -5,6 +5,12 @@ export type Me = { id: number; name: string; role: Role }
 export type Variant = { id: number; product_id: number; name: string; price: number }
 export type Modifier = { id: number; group_id: number; name: string; price: number }
 export type ModGroup = { id: number; name: string; min: number; max: number; modifiers: Modifier[] }
+export type GroupInput = {
+  name: string
+  min: number
+  max: number
+  modifiers: { id?: number; name: string; price: number }[]
+}
 export type TableShape = 'square' | 'round' | 'rect'
 export type Ingredient = { id: number; name: string; price: number; included: boolean }
 export type Product = {
@@ -222,6 +228,10 @@ export const api = {
 
   // ürün yönetimi
   modifierGroups: () => request<ModGroup[]>('GET', '/api/admin/modifier-groups'),
+  createModifierGroup: (body: GroupInput) => request<{ id: number }>('POST', '/api/admin/modifier-groups', body),
+  updateModifierGroup: (id: number, body: GroupInput) =>
+    request<{ ok: boolean }>('PUT', `/api/admin/modifier-groups/${id}`, body),
+  deleteModifierGroup: (id: number) => request<{ ok: boolean }>('DELETE', `/api/admin/modifier-groups/${id}`),
   product: (id: number) => request<AdminProduct>('GET', `/api/admin/products/${id}`),
   createProduct: (body: ProductInput) => request<{ id: number }>('POST', '/api/admin/products', body),
   updateProduct: (id: number, body: ProductInput) => request<{ ok: boolean }>('PUT', `/api/admin/products/${id}`, body),

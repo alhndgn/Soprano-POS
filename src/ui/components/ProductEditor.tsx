@@ -6,6 +6,7 @@ import {
   type ModGroup,
   type ProductInput,
 } from '../api.ts'
+import ModifierGroupEditor from './ModifierGroupEditor.tsx'
 
 const tl = (cents: number) =>
   (cents / 100).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -88,12 +89,18 @@ export default function ProductEditor({ productId, categories, onClose, onSaved,
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [newCategory, setNewCategory] = useState('')
+  /** null → kapalı, 0 → yeni grup, n → düzenlenen grup */
+  const [groupEditor, setGroupEditor] = useState<number | null>(null)
 
-  useEffect(() => {
+  const loadGroups = () =>
     api
       .modifierGroups()
       .then(setGroups)
       .catch((e) => onError(e.message))
+
+  useEffect(() => {
+    void loadGroups()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onError])
 
   useEffect(() => {
@@ -425,23 +432,42 @@ export default function ProductEditor({ productId, categories, onClose, onSaved,
                   {groups.map((g) => {
                     const on = form.groupIds.includes(g.id)
                     return (
-                      <button
-                        key={g.id}
-                        className={`chip${on ? ' on' : ''}`}
-                        onClick={() =>
-                          setForm({
-                            ...form,
-                            groupIds: on ? form.groupIds.filter((x) => x !== g.id) : [...form.groupIds, g.id],
-                          })
-                        }
-                      >
-                        {g.name}
-                        <small>{g.modifiers.length} seçenek</small>
-                      </button>
+                      <div className={`mod-chip${on ? ' on' : ''}`} key={g.id}>
+                        <button
+                          type="button"
+                          className="mod-chip-main"
+                          aria-pressed={on}
+                          onClick={() =>
+                            setForm({
+                              ...form,
+                              groupIds: on ? form.groupIds.filter((x) => x !== g.id) : [...form.groupIds, g.id],
+                            })
+                          }
+                        >
+                          {g.name}
+                          <small>
+                            {g.modifiers.length} seçenek{g.min > 0 ? ' · zorunlu' : ''}
+                          </small>
+                        </button>
+                        <button
+                          type="button"
+                          className="mod-chip-edit"
+                          aria-label={`${g.name} grubunu düzenle`}
+                          title="Grubu düzenle"
+                          onClick={() => setGroupEditor(g.id)}
+                        >
+                          ✎
+                        </button>
+                      </div>
                     )
                   })}
-                  {groups.length === 0 && <p className="hint">Seçenek grubu tanımlı değil.</p>}
+                  <button type="button" className="btn ghost sm" onClick={() => setGroupEditor(0)}>
+                    + Yeni grup
+                  </button>
                 </div>
+                <p className="hint" style={{ marginTop: 8 }}>
+                  Seçili gruplar bu ürüne bağlıdır. Kalem ikonuyla grubun adını, zorunluluğunu ve seçeneklerini düzenle.
+                </p>
               </section>
             </div>
 
@@ -506,6 +532,25 @@ export default function ProductEditor({ productId, categories, onClose, onSaved,
           </button>
         </div>
       </div>
+
+      {groupEditor !== null && (
+        <ModifierGroupEditor
+          group={groups.find((g) => g.id === groupEditor) ?? null}
+          onClose={() => setGroupEditor(null)}
+          onSaved={(message, id) => {
+            const edited = groupEditor
+            void loadGroups()
+            if (id) {
+              setForm((f) => (f.groupIds.includes(id) ? f : { ...f, groupIds: [...f.groupIds, id] }))
+            } else if (edited) {
+              setForm((f) => ({ ...f, groupIds: f.groupIds.filter((x) => x !== edited) }))
+            }
+            setGroupEditor(null)
+            onSaved(message)
+          }}
+          onError={onError}
+        />
+      )}
     </div>
   )
 }
