@@ -35,12 +35,28 @@ const NAV = [
   { to: '/admin', label: 'Yönetim', icon: 'M12 4l2.1 4.3 4.7.7-3.4 3.3.8 4.7L12 15l-4.2 2 .8-4.7L5.2 9l4.7-.7L12 4z' },
 ]
 
+type Theme = 'light' | 'dark'
+const THEME_KEY = 'soprano_theme'
+
+function initialTheme(): Theme {
+  const saved = localStorage.getItem(THEME_KEY)
+  if (saved === 'dark' || saved === 'light') return saved
+  return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
 export default function App() {
   const [boot, setBoot] = useState<Bootstrap | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [theme, setTheme] = useState<Theme>(initialTheme)
   const navigate = useNavigate()
   const location = useLocation()
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    document.documentElement.style.colorScheme = theme
+    localStorage.setItem(THEME_KEY, theme)
+  }, [theme])
 
   const refresh = useCallback(async () => {
     if (!auth.get()) {
@@ -104,6 +120,7 @@ export default function App() {
       <a className="skip-link" href="#main-content">Ana içeriğe geç</a>
       <div className="shell">
         <aside className="sidebar" aria-label="Ana navigasyon">
+          <div className="sidebar-inner">
           <div className="brand">
             <span className="brand-mark" aria-hidden="true">S</span>
             <div className="brand-copy">
@@ -122,24 +139,34 @@ export default function App() {
             {NAV.filter((n) => allowed(n.to)).map((n) => (
               <NavLink key={n.to} to={n.to} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
                 <Icon d={n.icon} />
-                <span>{n.label}</span>
+                <span className="nav-label">{n.label}</span>
               </NavLink>
             ))}
             {allowed('/shift') && (
               <NavLink to="/shift" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
                 <Icon d="M12 7v5l3 2M12 3a9 9 0 100 18 9 9 0 000-18z" />
-                <span>Vardiya</span>
+                <span className="nav-label">Vardiya</span>
               </NavLink>
             )}
           </nav>
           <div className="sidebar-foot">
             <div className="who">
               <span className="avatar">{me?.name?.[0]}</span>
-              <div>
+              <div className="who-copy">
                 <b>{me?.name}</b>
                 <small>{me?.role === 'manager' ? 'Yönetici' : me?.role === 'cashier' ? 'Kasiyer' : 'Garson'}</small>
               </div>
             </div>
+            <button
+              type="button"
+              className="btn ghost sm theme-toggle"
+              aria-label={theme === 'dark' ? 'Açık temaya geç' : 'Karanlık temaya geç'}
+              title={theme === 'dark' ? 'Açık tema' : 'Karanlık tema'}
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            >
+              <span aria-hidden="true" className="theme-icon">{theme === 'dark' ? '☀' : '☾'}</span>
+              <span className="nav-label">{theme === 'dark' ? 'Açık tema' : 'Karanlık tema'}</span>
+            </button>
             <button
               type="button"
               className="btn ghost sm"
@@ -152,6 +179,7 @@ export default function App() {
             >
               Çıkış
             </button>
+          </div>
           </div>
         </aside>
 

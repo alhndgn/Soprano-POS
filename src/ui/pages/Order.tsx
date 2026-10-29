@@ -437,7 +437,6 @@ export default function OrderPage() {
           onClose={() => setPayOpen(false)}
           onSubmit={(payload) => api.pay(orderId, payload)}
           onDone={async (result) => {
-            if (result.change > 0) alert(`Para üstü: ${money(result.change)}`)
             if (result.status === 'paid') {
               await refresh()
               setPayOpen(false)
