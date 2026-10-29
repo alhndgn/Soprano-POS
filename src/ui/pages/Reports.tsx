@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, money } from '../api.ts'
+import { reportCustomerName, reportPaymentLabel } from '../report.ts'
 
 type Report = Awaited<ReturnType<typeof api.report>>
 
@@ -47,6 +48,10 @@ export default function Reports() {
           <div className="value">{money(avg)}</div>
         </div>
         <div className="kpi">
+          <div className="label">İskonto</div>
+          <div className="value">{money(rep?.discountTotal ?? 0)}</div>
+        </div>
+        <div className="kpi">
           <div className="label">Nakit / Kart</div>
           <div className="value" style={{ fontSize: 19 }}>
             {(rep?.byMethod ?? []).map((m) => `${m.method === 'cash' ? 'N' : m.method === 'card' ? 'K' : 'D'}: ${money(m.amount)}`).join(' · ') || '—'}
@@ -89,6 +94,66 @@ export default function Reports() {
                 <span className="rank-rev">{money(p.revenue)}</span>
               </div>
             ))}
+          </div>
+        </div>
+      </div>
+      <div className="report-tables">
+        <div className="panel report-table-panel">
+          <div className="panel-head">
+            <div>
+              <p className="panel-kicker">TAHSİLAT KAYDI</p>
+              <h3>Ödenen adisyonlar</h3>
+            </div>
+            <span className="pill">{(rep?.paidOrders ?? []).length} adisyon</span>
+          </div>
+          <div className="report-table-scroll">
+            {(rep?.paidOrders ?? []).length === 0 ? (
+              <div className="kds-empty">Bu tarihte ödenmiş adisyon yok</div>
+            ) : (
+              <table className="data-table report-table">
+                <thead><tr><th>Adisyon</th><th>Müşteri</th><th>Ödeme</th><th>İskonto</th><th>Net</th></tr></thead>
+                <tbody>
+                  {(rep?.paidOrders ?? []).map((row) => (
+                    <tr key={row.order_id}>
+                      <td><b>#{row.order_id}</b><small>{row.table_name ?? 'Paket'}</small></td>
+                      <td>{reportCustomerName(row.customer_name)}</td>
+                      <td>{reportPaymentLabel(row.payment_methods)}</td>
+                      <td>{row.discount_amount ? money(row.discount_amount) : '—'}</td>
+                      <td><b>{money(row.total)}</b></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+
+        <div className="panel report-table-panel void-report-panel">
+          <div className="panel-head">
+            <div>
+              <p className="panel-kicker">DENETİM İZİ</p>
+              <h3>İptal edilen adisyonlar</h3>
+            </div>
+            <span className="pill danger-pill">{(rep?.voidedOrders ?? []).length} iptal</span>
+          </div>
+          <div className="report-table-scroll">
+            {(rep?.voidedOrders ?? []).length === 0 ? (
+              <div className="kds-empty">Bu tarihte iptal edilen adisyon yok</div>
+            ) : (
+              <table className="data-table report-table">
+                <thead><tr><th>Adisyon</th><th>Müşteri</th><th>Neden / personel</th><th>Tutar</th></tr></thead>
+                <tbody>
+                  {(rep?.voidedOrders ?? []).map((row) => (
+                    <tr key={row.order_id}>
+                      <td><b>#{row.order_id}</b><small>{row.table_name ?? 'Paket'}</small></td>
+                      <td>{reportCustomerName(row.customer_name)}</td>
+                      <td><b>{row.reason}</b><small>{row.voided_by ?? '—'}</small></td>
+                      <td><b>{money(row.total)}</b><small>brüt {money(row.gross_total)}</small></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       </div>

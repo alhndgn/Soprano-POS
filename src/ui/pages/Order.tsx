@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useApp } from '../App.tsx'
 import { api, elapsed, lineTotal, money, type Order, type OrderLine, type Product } from '../api.ts'
 import PaymentModal from '../components/PaymentModal.tsx'
+import VoidOrderModal from '../components/VoidOrderModal.tsx'
 
 type IngChoice = { id: number; mode: 'removed' | 'added' }
 type SheetState = {
@@ -26,6 +27,7 @@ export default function OrderPage() {
   const [catId, setCatId] = useState<number | null>(null)
   const [sheet, setSheet] = useState<SheetState | null>(null)
   const [payOpen, setPayOpen] = useState(false)
+  const [voidOpen, setVoidOpen] = useState(false)
   const [moveOpen, setMoveOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -211,18 +213,10 @@ export default function OrderPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {canVoid && (
               <button
+                type="button"
                 className="btn ghost sm"
                 style={{ color: 'var(--danger)', fontSize: 11.5, padding: '5px 9px' }}
-                onClick={async () => {
-                  if (!confirm('Adisyon iptal edilsin mi? (ödeme alınmadıysa)')) return
-                  try {
-                    await api.voidOrder(orderId)
-                    await refresh()
-                    navigate('/tables')
-                  } catch (e: any) {
-                    setError(e.message)
-                  }
-                }}
+                onClick={() => setVoidOpen(true)}
               >
                 Adisyonu iptal
               </button>
@@ -451,6 +445,19 @@ export default function OrderPage() {
             } else {
               await load()
             }
+          }}
+          onError={setError}
+        />
+      )}
+
+      {voidOpen && order && (
+        <VoidOrderModal
+          orderId={orderId}
+          onClose={() => setVoidOpen(false)}
+          onDone={async () => {
+            await refresh()
+            setVoidOpen(false)
+            navigate('/tables')
           }}
           onError={setError}
         />
