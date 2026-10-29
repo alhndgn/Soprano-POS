@@ -134,7 +134,7 @@ ids = [p["id"] for c in boot3["menu"] for p in c["products"]]
 ok("ürün menüden kalktı", pid not in ids)
 
 # 8) temizlik: test adisyonunu iptal et
-call("POST", f"/api/orders/{order['id']}/void", {}, T)
+call("POST", f"/api/orders/{order['id']}/void", {"reason": "Ürün yönetimi e2e temizliği"}, T)
 
 print("\n=== SONUÇ:", "TÜMÜ GEÇTİ" if not failed else "HATA VAR", "===")
 sys.exit(1 if failed else 0)

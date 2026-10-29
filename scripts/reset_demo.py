@@ -31,7 +31,7 @@ def main():
     voided = 0
     for t in tables:
         if t.get("order"):
-            s, _ = call("POST", f"/api/orders/{t['order']['id']}/void", {}, token)
+            s, _ = call("POST", f"/api/orders/{t['order']['id']}/void", {"reason": "Demo yenileme"}, token)
             if s == 200:
                 voided += 1
     print("iptal edilen adisyon:", voided)
