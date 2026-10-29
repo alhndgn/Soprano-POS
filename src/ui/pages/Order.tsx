@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useApp } from '../App.tsx'
 import { api, elapsed, lineTotal, money, type Order, type OrderLine, type Product } from '../api.ts'
+import PaymentModal from '../components/PaymentModal.tsx'
 
 type IngChoice = { id: number; mode: 'removed' | 'added' }
 type SheetState = {
@@ -438,19 +439,20 @@ export default function OrderPage() {
 
       {payOpen && order && (
         <PaymentModal
-          total={order.totals.total}
+          order={order}
           onClose={() => setPayOpen(false)}
-          onDone={async (payments) => {
-            try {
-              const r = await api.pay(orderId, payments)
+          onSubmit={(payload) => api.pay(orderId, payload)}
+          onDone={async (result) => {
+            if (result.change > 0) alert(`Para üstü: ${money(result.change)}`)
+            if (result.status === 'paid') {
               await refresh()
               setPayOpen(false)
-              if (r.change > 0) alert(`Para üstü: ${money(r.change)}`)
               navigate('/tables')
-            } catch (e: any) {
-              setError(e.message)
+            } else {
+              await load()
             }
           }}
+          onError={setError}
         />
       )}
 
@@ -549,104 +551,6 @@ function CartLine({
               İptal
             </button>
           )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function PaymentModal({
-  total,
-  onClose,
-  onDone,
-}: {
-  total: number
-  onClose: () => void
-  onDone: (payments: { method: 'cash' | 'card' | 'other'; amount: number }[]) => void
-}) {
-  const [method, setMethod] = useState<'cash' | 'card'>('cash')
-  const [amount, setAmount] = useState('')
-  const [payments, setPayments] = useState<{ method: 'cash' | 'card' | 'other'; amount: number }[]>([])
-
-  const paid = payments.reduce((s, p) => s + p.amount, 0)
-  const remain = Math.max(0, total - paid)
-  const parsed = Math.round(Number(amount.replace(',', '.')) * 100) || 0
-  // Kutu boşsa kalanın tamamı ödeniyor sayılır (hızlı tek tuş akışı)
-  const pendingAmount = parsed > 0 ? parsed : payments.length ? 0 : remain
-  const willPay = paid + pendingAmount
-  const isPartial = parsed > 0 && parsed < remain
-  const quick = [total, Math.ceil(total / 5000) * 5000, Math.ceil(total / 10000) * 10000, Math.ceil(total / 50000) * 50000]
-    .filter((v, i, arr) => v >= remain && arr.indexOf(v) === i)
-    .slice(0, 4)
-
-  const add = () => {
-    if (parsed <= 0) return
-    setPayments([...payments, { method, amount: parsed }])
-    setAmount('')
-  }
-
-  const complete = () => {
-    const final = [...payments]
-    if (pendingAmount > 0) final.push({ method, amount: pendingAmount })
-    if (final.reduce((s, p) => s + p.amount, 0) >= total) onDone(final)
-  }
-
-  return (
-    <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal">
-        <h3>Ödeme</h3>
-        <div className="sub">Kalan: {money(remain)}</div>
-        <div className="pay-amount">{money(remain)}</div>
-
-        <div className="pay-methods">
-          <button className={`pay-method${method === 'cash' ? ' on' : ''}`} onClick={() => setMethod('cash')}>
-            Nakit
-          </button>
-          <button className={`pay-method${method === 'card' ? ' on' : ''}`} onClick={() => setMethod('card')}>
-            Kredi Kartı
-          </button>
-        </div>
-
-        <div className="quick-amounts">
-          {quick.map((q) => (
-            <button key={q} className="chip" onClick={() => setAmount((q / 100).toFixed(2).replace('.', ','))}>
-              {money(q)}
-            </button>
-          ))}
-        </div>
-
-        <input
-          className="input"
-          inputMode="decimal"
-          placeholder="Tutar (₺)"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && add()}
-        />
-
-        {payments.length > 0 && (
-          <div className="pay-rows" style={{ marginTop: 12 }}>
-            {payments.map((p, i) => (
-              <div className="pay-row" key={i}>
-                <span>{p.method === 'cash' ? 'Nakit' : 'Kart'}</span>
-                <b>{money(p.amount)}</b>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="pay-summary">
-          <span>Ödenen</span>
-          <b>{money(paid)}</b>
-        </div>
-
-        <div className="modal-actions">
-          <button className="btn" onClick={isPartial ? add : onClose}>
-            {isPartial ? 'Parçalı Ekle' : 'Vazgeç'}
-          </button>
-          <button className="btn primary" disabled={willPay < total} onClick={complete}>
-            {willPay >= total ? 'Adisyonu Kapat' : 'Tutar Yetersiz'}
-          </button>
         </div>
       </div>
     </div>
