@@ -7,6 +7,47 @@ import {
   type ProductInput,
 } from '../api.ts'
 
+const tl = (cents: number) =>
+  (cents / 100).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+/** Kuruş değerini Türkçe biçimde düzenler; yazarken imleç zıplamaz, alandan çıkınca normalize eder. */
+function PriceInput({
+  value,
+  onChange,
+  placeholder = '0,00',
+}: {
+  value: number
+  onChange: (cents: number) => void
+  placeholder?: string
+}) {
+  const [text, setText] = useState(value ? (value / 100).toFixed(2).replace('.', ',') : '')
+
+  useEffect(() => {
+    const parsed = Math.round(Number(text.replace(',', '.')) * 100) || 0
+    if (parsed !== value) setText(value ? (value / 100).toFixed(2).replace('.', ',') : '')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value])
+
+  return (
+    <input
+      className="input"
+      inputMode="decimal"
+      placeholder={placeholder}
+      value={text}
+      onChange={(e) => {
+        const t = e.target.value
+        setText(t)
+        onChange(Math.round(Number(t.replace(',', '.')) * 100) || 0)
+      }}
+      onBlur={() => {
+        const cents = Math.round(Number(text.replace(',', '.')) * 100) || 0
+        setText(cents ? (cents / 100).toFixed(2).replace('.', ',') : '')
+        onChange(cents)
+      }}
+    />
+  )
+}
+
 type SizeRow = { id?: number; name: string; price: number }
 type IngRow = { id?: number; name: string; price: number; included: boolean }
 type CategoryRow = { id: number; name: string }
@@ -286,13 +327,9 @@ export default function ProductEditor({ productId, categories, onClose, onSaved,
                         }}
                       />
                       <div className="price-input">
-                        <input
-                          className="input"
-                          inputMode="decimal"
-                          placeholder="0,00"
-                          value={s.price ? (s.price / 100).toString() : ''}
-                          onChange={(e) => {
-                            const v = Math.round(Number(e.target.value.replace(',', '.')) * 100) || 0
+                        <PriceInput
+                          value={s.price}
+                          onChange={(v) => {
                             const sizes = [...form.sizes]
                             sizes[idx] = { ...s, price: v }
                             setForm({ ...form, sizes })
@@ -340,13 +377,9 @@ export default function ProductEditor({ productId, categories, onClose, onSaved,
                         }}
                       />
                       <div className="price-input">
-                        <input
-                          className="input"
-                          inputMode="decimal"
-                          placeholder="0,00"
-                          value={ing.price ? (ing.price / 100).toString() : ''}
-                          onChange={(e) => {
-                            const v = Math.round(Number(e.target.value.replace(',', '.')) * 100) || 0
+                        <PriceInput
+                          value={ing.price}
+                          onChange={(v) => {
                             const ingredients = [...form.ingredients]
                             ingredients[idx] = { ...ing, price: v }
                             setForm({ ...form, ingredients })
@@ -440,6 +473,10 @@ export default function ProductEditor({ productId, categories, onClose, onSaved,
                   <b>{categories.find((c) => c.id === form.categoryId)?.name ?? '—'}</b>
                 </div>
                 <div className="summary-row">
+                  <span>KDV</span>
+                  <b>%{form.vatRate}</b>
+                </div>
+                <div className="summary-row">
                   <span>Boyut</span>
                   <b>{form.sizes.length}</b>
                 </div>
@@ -447,7 +484,7 @@ export default function ProductEditor({ productId, categories, onClose, onSaved,
                   <span>Fiyat aralığı</span>
                   <b>
                     {form.sizes.length
-                      ? `${Math.min(...form.sizes.map((s) => s.price)) / 100} – ${Math.max(...form.sizes.map((s) => s.price)) / 100} ₺`
+                      ? `${tl(Math.min(...form.sizes.map((s) => s.price)))} – ${tl(Math.max(...form.sizes.map((s) => s.price)))} ₺`
                       : '—'}
                   </b>
                 </div>
