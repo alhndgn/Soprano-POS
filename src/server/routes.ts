@@ -460,6 +460,27 @@ export async function registerRoutes(app: FastifyInstance) {
       if (body.void) {
         requireRole(user(req), ['manager'])
         await db.one(`UPDATE order_lines SET status='void' WHERE id=$1 RETURNING id`, [lineId])
+        if (await hasPrinter('kitchen')) {
+          const order = await db.one<any>(
+            `SELECT o.id, t.name AS table_name FROM orders o LEFT JOIN tables t ON t.id=o.table_id WHERE o.id=$1`,
+            [line.order_id],
+          )
+          await db.one(
+            `INSERT INTO print_jobs (kind, device, order_id, payload) VALUES ('cancel','kitchen',$1,$2) RETURNING id`,
+            [
+              line.order_id,
+              JSON.stringify({
+                orderId: line.order_id,
+                tableName: order?.table_name ?? 'Paket',
+                staffName: user(req).name,
+                timeISO: new Date().toISOString(),
+                scope: 'line',
+                reason: 'Ürün iptali',
+                lines: [{ name: line.name, qty: line.qty, note: line.note }],
+              }),
+            ],
+          )
+        }
       } else {
         if (body.qty !== undefined)
           await db.one(`UPDATE order_lines SET qty=$1 WHERE id=$2 RETURNING id`, [body.qty, lineId])
@@ -529,7 +550,10 @@ export async function registerRoutes(app: FastifyInstance) {
       requireRole(user(req), ['manager'])
       const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
       const { reason } = z.object({ reason: z.string().trim().min(3).max(300) }).parse(req.body)
-      const order = await db.one<any>(`SELECT * FROM orders WHERE id=$1`, [id])
+      const order = await db.one<any>(
+        `SELECT o.*, t.name AS table_name FROM orders o LEFT JOIN tables t ON t.id=o.table_id WHERE o.id=$1`,
+        [id],
+      )
       if (!order) {
         const e: any = new Error('Adisyon bulunamadı')
         e.statusCode = 404
@@ -551,6 +575,40 @@ export async function registerRoutes(app: FastifyInstance) {
          WHERE id=$3 RETURNING id`,
         [reason, user(req).id, id],
       )
+
+      // Mutfağa "bu adisyon iptal" fişi gitsin ki hazırlık durdurulsun.
+      if (await hasPrinter('kitchen')) {
+        const lines = await db.all<any>(
+          `SELECT ol.name, ol.qty, ol.note FROM order_lines ol
+           WHERE ol.order_id=$1 AND ol.status <> 'void' ORDER BY ol.id`,
+          [id],
+        )
+        const total = await db.one<{ total: number }>(
+          `SELECT COALESCE(SUM((ol.unit_price
+             + COALESCE((SELECT SUM(m.price) FROM line_modifiers lm JOIN modifiers m ON m.id=lm.modifier_id WHERE lm.line_id=ol.id), 0)
+             + COALESCE((SELECT SUM(li.price) FROM line_ingredients li WHERE li.line_id=ol.id AND li.mode='added'), 0)
+           ) * ol.qty), 0)::int AS total
+           FROM order_lines ol WHERE ol.order_id=$1 AND ol.status <> 'void'`,
+          [id],
+        )
+        await db.one(
+          `INSERT INTO print_jobs (kind, device, order_id, payload) VALUES ('cancel','kitchen',$1,$2) RETURNING id`,
+          [
+            id,
+            JSON.stringify({
+              orderId: id,
+              tableName: order.table_name ?? 'Paket',
+              staffName: user(req).name,
+              timeISO: new Date().toISOString(),
+              scope: 'order',
+              reason,
+              total: total?.total ?? 0,
+              lines: lines.map((l) => ({ name: l.name, qty: l.qty, note: l.note })),
+            }),
+          ],
+        )
+      }
+
       broadcast()
       return { ok: true, orderId: id }
     })
@@ -1620,7 +1678,8 @@ export async function registerRoutes(app: FastifyInstance) {
     const { device } = z.object({ device: z.enum(['receipt', 'kitchen']).optional() }).parse(req.query)
     // Köprü çöktüyse 3 dakikadan eski 'printing' işleri geri al.
     await db.run(`UPDATE print_jobs SET status='queued', claimed_at=NULL
-                  WHERE status='printing' AND claimed_at < now() - interval '3 minutes'`)
+                  WHERE status='printing'
+                    AND (claimed_at IS NULL OR claimed_at < now() - interval '3 minutes')`)
     // İşi atomik sahiplen: aynı iş iki kez basılmasın.
     const rows = await db.all<any>(
       `UPDATE print_jobs SET status='printing', claimed_at=now()
@@ -1657,14 +1716,18 @@ export async function registerRoutes(app: FastifyInstance) {
   })
 
   /** Başarısız işi yeniden kuyruğa alır (yazıcı düzeltildikten sonra). */
-  app.post('/api/admin/print/jobs/:id/retry', async (req) => {
-    requireRole(user(req), ['manager'])
-    const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
-    const job = await db.one<any>(`SELECT id FROM print_jobs WHERE id=$1`, [id])
-    if (!job) throw httpError(404, 'İş bulunamadı')
-    await db.run(`UPDATE print_jobs SET status='queued', error=NULL WHERE id=$1`, [id])
-    broadcast()
-    return { ok: true }
+  await app.register(async (scope) => {
+    scope.addHook('preHandler', authHook)
+
+    scope.post('/api/admin/print/jobs/:id/retry', async (req) => {
+      requireRole(user(req), ['manager'])
+      const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
+      const job = await db.one<any>(`SELECT id FROM print_jobs WHERE id=$1`, [id])
+      if (!job) throw httpError(404, 'İş bulunamadı')
+      await db.run(`UPDATE print_jobs SET status='queued', error=NULL, claimed_at=NULL WHERE id=$1`, [id])
+      broadcast()
+      return { ok: true }
+    })
   })
 }
 

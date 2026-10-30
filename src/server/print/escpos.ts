@@ -76,6 +76,18 @@ export type ReceiptPayload = {
   footer: string
 }
 
+export type CancelPayload = {
+  orderId: number
+  tableName: string
+  staffName: string
+  timeISO: string
+  /** 'order' = adisyon tamamen iptal, 'line' = tek ürün iptali */
+  scope: 'order' | 'line'
+  reason: string
+  total?: number
+  lines: { name: string; qty: number; note?: string | null }[]
+}
+
 export type KotPayload = {
   orderId: number
   tableName: string
@@ -117,6 +129,30 @@ export function buildReceipt(p: ReceiptPayload, paperWidth = 80): Buffer {
   }
   if (p.change > 0) e.row('Para Ustu', tl(p.change))
   e.align('center').feed(1).text(p.footer).feed(2).cut()
+  return Buffer.from(e.bytes)
+}
+
+export function buildCancel(p: CancelPayload, paperWidth = 80): Buffer {
+  const e = new EscPos(charsForPaper(paperWidth)).init()
+  e.align('center').bold(true).double(true).text('*** IPTAL ***').double(false).bold(false)
+  e.text(p.scope === 'order' ? 'ADISYON IPTALI' : 'URUN IPTALI')
+  e.align('left').line('=')
+  e.bold(true).text(`#${p.orderId}  ${p.tableName}`).bold(false)
+  e.text(new Date(p.timeISO).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }))
+  e.text(`Personel: ${p.staffName}`)
+  e.line()
+  for (const l of p.lines) {
+    e.bold(true).text(`${l.qty} x ${l.name}`).bold(false)
+    if (l.note) e.text(`   NOT: ${l.note}`)
+  }
+  if (p.total !== undefined) {
+    e.line()
+    e.row('IPTAL TUTARI', tl(p.total))
+  }
+  e.line()
+  e.text('SEBEP:')
+  e.text(p.reason)
+  e.feed(2).cut()
   return Buffer.from(e.bytes)
 }
 

@@ -266,6 +266,9 @@ CREATE INDEX IF NOT EXISTS printers_device_idx ON printers(device) WHERE enabled
 ALTER TABLE print_jobs ADD COLUMN IF NOT EXISTS printer_name text;
 ALTER TABLE print_jobs ADD COLUMN IF NOT EXISTS attempts integer NOT NULL DEFAULT 0;
 ALTER TABLE print_jobs ADD COLUMN IF NOT EXISTS claimed_at timestamptz;
+ALTER TABLE print_jobs DROP CONSTRAINT IF EXISTS print_jobs_kind_check;
+ALTER TABLE print_jobs ADD CONSTRAINT print_jobs_kind_check
+  CHECK (kind IN ('receipt','kot','cancel'));
 ALTER TABLE print_jobs DROP CONSTRAINT IF EXISTS print_jobs_status_check;
 ALTER TABLE print_jobs ADD CONSTRAINT print_jobs_status_check
   CHECK (status IN ('queued','printing','printed','failed'));

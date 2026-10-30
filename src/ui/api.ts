@@ -133,7 +133,7 @@ export type PrinterInput = {
 }
 export type PrintJob = {
   id: number
-  kind: 'receipt' | 'kot'
+  kind: 'receipt' | 'kot' | 'cancel'
   device: PrinterDevice
   status: 'queued' | 'printing' | 'printed' | 'failed'
   error: string | null

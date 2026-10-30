@@ -25,7 +25,7 @@ import { mkdir, writeFile, unlink } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { buildKot, buildReceipt, trAscii, type KotPayload, type ReceiptPayload } from '../server/print/escpos.ts'
+import { buildCancel, buildKot, buildReceipt, trAscii, type CancelPayload, type KotPayload, type ReceiptPayload } from '../server/print/escpos.ts'
 import { charsForWidth, parseNetworkAddress } from '../server/print/routing.ts'
 
 const execFileAsync = promisify(execFile)
@@ -44,7 +44,8 @@ const OUT_DIR = path.join(process.cwd(), 'var', 'prints')
 const SPOOL_DIR = path.join(process.cwd(), 'var', 'spool')
 
 type JobPrinter = { id: number; name: string; transport: 'network' | 'windows' | 'file'; address: string; paperWidth: number }
-type Job = { id: number; kind: 'receipt' | 'kot'; device: 'receipt' | 'kitchen'; payload: any; printer: JobPrinter | null }
+type JobKind = 'receipt' | 'kot' | 'cancel'
+type Job = { id: number; kind: JobKind; device: 'receipt' | 'kitchen'; payload: any; printer: JobPrinter | null }
 
 async function sendNetwork(address: string, data: Buffer): Promise<void> {
   const { host, port } = parseNetworkAddress(address)
@@ -81,7 +82,21 @@ async function sendWindows(printerName: string, data: Buffer, jobId: number): Pr
   }
 }
 
+function buildFor(kind: JobKind, payload: any, width: number): Buffer {
+  if (kind === 'kot') return buildKot(payload, width)
+  if (kind === 'cancel') return buildCancel(payload, width)
+  return buildReceipt(payload, width)
+}
+
 async function previewText(kind: string, payload: any): Promise<string> {
+  if (kind === 'cancel') {
+    const p = payload as CancelPayload
+    return [
+      `*** IPTAL *** ${p.scope === 'order' ? 'ADISYON' : 'URUN'} #${p.orderId} — ${p.tableName}`,
+      `Sebep: ${p.reason}`,
+      ...p.lines.map((l) => `${l.qty} x ${l.name}`),
+    ].join('\n')
+  }
   if (kind === 'kot') {
     const p = payload as KotPayload
     return [
@@ -142,7 +157,7 @@ async function drain() {
   for (const job of jobs) {
     try {
       const width = charsForWidth(job.printer?.paperWidth ?? 80)
-      const buf = job.kind === 'kot' ? buildKot(job.payload, width) : buildReceipt(job.payload, width)
+      const buf = buildFor(job.kind, job.payload, width)
       const printerName = await deliver(job, buf)
       await fetch(`${API}/api/print/jobs/${job.id}/done`, {
         method: 'POST',

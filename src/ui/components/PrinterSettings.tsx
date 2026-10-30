@@ -386,7 +386,7 @@ export default function PrinterSettings({ onError, onOk }: { onError: (m: string
             {jobs.map((job) => (
               <tr key={job.id}>
                 <td style={{ fontVariantNumeric: 'tabular-nums' }}>{job.id}</td>
-                <td>{job.kind === 'kot' ? 'Mutfak KOT' : 'Müşteri fişi'}</td>
+                <td>{job.kind === 'kot' ? 'Mutfak KOT' : job.kind === 'cancel' ? 'İptal fişi' : 'Müşteri fişi'}</td>
                 <td>{job.printer_name ?? (job.device === 'kitchen' ? 'Mutfak' : 'Kasa')}</td>
                 <td>
                   <span className={`job-status ${job.status}`}>
