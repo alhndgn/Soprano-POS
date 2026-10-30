@@ -69,6 +69,8 @@ CREATE TABLE IF NOT EXISTS products (
 ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url text;
 -- Uzun açıklama / hazırlanış (menüde ve sipariş ekranında gösterilir)
 ALTER TABLE products ADD COLUMN IF NOT EXISTS description text;
+-- Yumuşak silme: silinen ürün yönetim listesinde de görünmez (pasiften farkı budur)
+ALTER TABLE products ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
 
 -- Ürünün içindekiler: dahil olanlar ve ekstra fiyatlı eklenebilirler
 CREATE TABLE IF NOT EXISTS product_ingredients (

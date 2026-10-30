@@ -306,6 +306,7 @@ export const api = {
         name: string
         vat_rate: number
         image_url: string | null
+        active: boolean
         category: string
         category_id: number
         variants: Variant[]
@@ -325,6 +326,8 @@ export const api = {
   createProduct: (body: ProductInput) => request<{ id: number }>('POST', '/api/admin/products', body),
   updateProduct: (id: number, body: ProductInput) => request<{ ok: boolean }>('PUT', `/api/admin/products/${id}`, body),
   deleteProduct: (id: number) => request<{ ok: boolean }>('DELETE', `/api/admin/products/${id}`),
+  setProductActive: (id: number, active: boolean) =>
+    request<{ ok: boolean; id: number; name: string; active: boolean }>('PATCH', `/api/admin/products/${id}/active`, { active }),
   addCategory: (name: string, emoji?: string) =>
     request<{ id: number; name: string }>('POST', '/api/admin/categories', { name, emoji }),
 

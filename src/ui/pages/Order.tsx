@@ -50,7 +50,8 @@ export default function OrderPage() {
     return () => clearInterval(t)
   }, [load])
 
-  const menu = boot?.menu ?? []
+  // Pasif ürünler sunucudan hiç gelmez; tamamen boşalan kategori de menüde görünmesin.
+  const menu = (boot?.menu ?? []).filter((c) => c.products.length > 0)
   const activeCat = menu.find((c) => c.id === catId) ?? menu[0]
 
   const totals = order?.totals

@@ -18,6 +18,7 @@ export default function Admin() {
   const [form, setForm] = useState({ name: '', role: 'waiter' as Role, pin: '' })
   const [uploading, setUploading] = useState<number | null>(null)
   const [editor, setEditor] = useState<{ open: boolean; id: number | null }>({ open: false, id: null })
+  const [menuFilter, setMenuFilter] = useState<'all' | 'active' | 'passive'>('all')
 
   const load = () => {
     api.adminMenu().then(setMenu).catch((e) => setError(e.message))
@@ -51,6 +52,20 @@ export default function Admin() {
       await api.deleteImage(id)
       load()
     } catch (e: any) {
+      setError(e.message)
+    }
+  }
+
+  const toggleActive = async (id: number, active: boolean) => {
+    setError(null)
+    // Anında geri bildirim: satırı hemen güncelle, sunucu reddederse geri al.
+    setMenu((prev) => prev.map((p) => (p.id === id ? { ...p, active } : p)))
+    try {
+      const res = await api.setProductActive(id, active)
+      setOk(`${res.name} ${res.active ? 'aktif' : 'pasif'} yapıldı`)
+      load()
+    } catch (e: any) {
+      setMenu((prev) => prev.map((p) => (p.id === id ? { ...p, active: !active } : p)))
       setError(e.message)
     }
   }
@@ -99,10 +114,31 @@ export default function Admin() {
 
       {tab === 'menu' && (
         <div className="panel">
-          <div className="panel-head">
-            <h3>Ürünler ve görseller</h3>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <span className="pill">JPEG / PNG / WEBP · en fazla 5 MB</span>
+          <div className="panel-head menu-head">
+            <div>
+              <h3>Ürünler ve görseller</h3>
+              <p className="printer-hint">
+                Pasife aldığın ürün sipariş ekranında görünmez; geçmiş adisyonlar bozulmaz.
+              </p>
+            </div>
+            <div className="menu-head-actions">
+              <div className="segmented" role="group" aria-label="Ürün filtresi">
+                {([
+                  ['all', 'Tümü', menu.length],
+                  ['active', 'Aktif', menu.filter((p) => p.active !== false).length],
+                  ['passive', 'Pasif', menu.filter((p) => p.active === false).length],
+                ] as const).map(([key, label, count]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={menuFilter === key ? 'on' : ''}
+                    aria-pressed={menuFilter === key}
+                    onClick={() => setMenuFilter(key)}
+                  >
+                    {label} ({count})
+                  </button>
+                ))}
+              </div>
               <button className="btn primary sm" onClick={() => setEditor({ open: true, id: null })}>
                 + Yeni ürün
               </button>
@@ -116,12 +152,17 @@ export default function Admin() {
                 <th>Kategori</th>
                 <th>KDV</th>
                 <th>Fiyatlar</th>
+                <th style={{ width: 108 }}>Durum</th>
                 <th style={{ width: 96 }}>İşlem</th>
               </tr>
             </thead>
             <tbody>
-              {menu.map((p) => (
-                <tr key={p.id}>
+              {menu
+                .filter((p) =>
+                  menuFilter === 'all' ? true : menuFilter === 'active' ? p.active !== false : p.active === false,
+                )
+                .map((p) => (
+                <tr key={p.id} className={p.active === false ? 'row-passive' : undefined}>
                   <td>
                     {p.image_url ? (
                       <img className="menu-thumb" src={p.image_url} alt={p.name} />
@@ -156,6 +197,19 @@ export default function Admin() {
                   <td style={{ color: 'var(--muted)' }}>%{p.vat_rate}</td>
                   <td style={{ fontVariantNumeric: 'tabular-nums' }}>
                     {p.variants.map((v) => `${v.name} ${money(v.price)}`).join(' · ')}
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className={`status-toggle${p.active === false ? ' off' : ''}`}
+                      role="switch"
+                      aria-checked={p.active !== false}
+                      aria-label={`${p.name} ${p.active === false ? 'pasif, aktifleştir' : 'aktif, pasife al'}`}
+                      onClick={() => void toggleActive(p.id, p.active === false)}
+                    >
+                      <span className="status-dot" aria-hidden="true" />
+                      {p.active === false ? 'Pasif' : 'Aktif'}
+                    </button>
                   </td>
                   <td>
                     <button className="btn sm" onClick={() => setEditor({ open: true, id: p.id })}>

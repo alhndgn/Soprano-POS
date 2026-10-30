@@ -1220,3 +1220,19 @@ small { font-size: 12px; }
 [data-theme='dark'] .printer-found-row { background: var(--panel-2); }
 [data-theme='dark'] .printer-found-row:hover { background: #202731; }
 [data-theme='dark'] .printer-state { background: #131820; }
+
+/* ---------- ürün aktif/pasif ---------- */
+.menu-head { align-items: flex-start; gap: 16px; }
+.menu-head-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.menu-head .printer-hint { margin-top: 4px; max-width: 46ch; }
+.status-toggle { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--ok-line); background: var(--ok-soft); color: var(--ok); font-size: 12px; font-weight: 700; white-space: nowrap; }
+.status-toggle .status-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 3px rgba(18, 128, 90, .16); }
+.status-toggle:hover { filter: brightness(.97); }
+.status-toggle.off { border-color: var(--line-strong); background: var(--bg); color: var(--muted); }
+.status-toggle.off .status-dot { box-shadow: 0 0 0 3px rgba(107, 114, 128, .14); }
+.row-passive td { opacity: .62; }
+.row-passive td:last-child, .row-passive td:nth-last-child(2) { opacity: 1; }
+.row-passive b { text-decoration: line-through; text-decoration-color: var(--dim); }
+
+[data-theme='dark'] .status-toggle { background: var(--ok-soft); border-color: var(--ok-line); color: var(--ok); }
+[data-theme='dark'] .status-toggle.off { background: #131820; border-color: var(--line-strong); color: var(--muted); }

@@ -231,7 +231,7 @@ export async function registerRoutes(app: FastifyInstance) {
       const categories = await db.all<any>(`SELECT id, name, emoji FROM categories ORDER BY sort, id`)
       const products = await db.all<any>(
         `SELECT id, category_id, name, vat_rate, image_url, description
-         FROM products WHERE active = true ORDER BY sort, id`,
+         FROM products WHERE active = true AND deleted_at IS NULL ORDER BY sort, id`,
       )
       const ingredients = await db.all<any>(
         `SELECT id, product_id, name, price, included FROM product_ingredients WHERE active = true ORDER BY sort, id`,
@@ -381,6 +381,11 @@ export async function registerRoutes(app: FastifyInstance) {
       if (!product) {
         const e: any = new Error('Ürün bulunamadı')
         e.statusCode = 404
+        throw e
+      }
+      if (product.active === false) {
+        const e: any = new Error(`${product.name} şu an pasif — siparişe eklenemez`)
+        e.statusCode = 400
         throw e
       }
       let variant = body.variantId
@@ -844,8 +849,9 @@ export async function registerRoutes(app: FastifyInstance) {
     scope.get('/api/admin/menu', async (req) => {
       requireRole(user(req), ['manager'])
       const products = await db.all<any>(
-        `SELECT p.id, p.name, p.vat_rate, p.image_url, c.name AS category, c.id AS category_id
-         FROM products p JOIN categories c ON c.id=p.category_id ORDER BY c.sort, p.sort`,
+        `SELECT p.id, p.name, p.vat_rate, p.image_url, p.active, c.name AS category, c.id AS category_id
+         FROM products p JOIN categories c ON c.id=p.category_id
+         WHERE p.deleted_at IS NULL ORDER BY c.sort, p.sort`,
       )
       const variants = await db.all<any>(`SELECT id, product_id, name, price FROM variants ORDER BY product_id, sort`)
       return products.map((p) => ({ ...p, variants: variants.filter((v) => v.product_id === p.id) }))
@@ -1087,6 +1093,20 @@ export async function registerRoutes(app: FastifyInstance) {
       })
     })
 
+    /** Ürünü menüde aktif/pasif yapar (malzeme bitince ürünü gizlemek için). */
+    scope.patch('/api/admin/products/:id/active', async (req) => {
+      requireRole(user(req), ['manager'])
+      const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
+      const { active } = z.object({ active: z.boolean() }).parse(req.body)
+      const row = await db.one<any>(
+        `UPDATE products SET active=$1 WHERE id=$2 RETURNING id, name, active`,
+        [active, id],
+      )
+      if (!row) throw httpError(404, 'Ürün bulunamadı')
+      broadcast('menu')
+      return { ok: true, id: row.id, name: row.name, active: row.active }
+    })
+
     scope.put('/api/admin/products/:id', async (req) => {
       requireRole(user(req), ['manager'])
       const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
@@ -1172,7 +1192,7 @@ export async function registerRoutes(app: FastifyInstance) {
     scope.delete('/api/admin/products/:id', async (req) => {
       requireRole(user(req), ['manager'])
       const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
-      await db.one(`UPDATE products SET active=false WHERE id=$1 RETURNING id`, [id])
+      await db.one(`UPDATE products SET active=false, deleted_at=now() WHERE id=$1 RETURNING id`, [id])
       broadcast()
       return { ok: true }
     })
