@@ -182,6 +182,8 @@ export default function PrinterSettings({ onError, onOk }: { onError: (m: string
         lan: res.candidates ?? [],
         note: res.available === false ? res.reason ?? 'Bulunamadı' : '',
       })
+      // Sonuç kartın altında kalmasın: görünür alana kaydır.
+      setTimeout(() => document.getElementById(`printer-found-${device}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 60)
     } catch (e: any) {
       onError(e.message)
     } finally {
@@ -280,7 +282,7 @@ export default function PrinterSettings({ onError, onOk }: { onError: (m: string
               </label>
 
               {detected && (
-                <div className="printer-found">
+                <div className="printer-found" id={`printer-found-${device}`} role="region" aria-live="polite" aria-label="Bulunan yazıcılar">
                   {detected.note && <p className="printer-found-note">{detected.note}</p>}
                   {detected.windows.map((p) => (
                     <button
@@ -309,7 +311,12 @@ export default function PrinterSettings({ onError, onOk }: { onError: (m: string
                     </button>
                   ))}
                   {!detected.note && !detected.windows.length && !detected.lan.length && (
-                    <p className="printer-found-note">Sonuç yok. Adresi elle girebilirsiniz.</p>
+                    <p className="printer-found-note">
+                      Sonuç yok. Yazıcı adını elle yazabilir veya yazıcının IP'sini girebilirsiniz.
+                    </p>
+                  )}
+                  {detected.note && (
+                    <p className="printer-found-note">Sorun: {detected.note}</p>
                   )}
                 </div>
               )}

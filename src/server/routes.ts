@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
-import { createWriteStream } from 'node:fs'
+import { createWriteStream, existsSync } from 'node:fs'
 import { mkdir, unlink } from 'node:fs/promises'
 import { pipeline } from 'node:stream/promises'
 import path from 'node:path'
@@ -30,6 +30,13 @@ const listPrinters = () => db.all<PrinterConfig>(`SELECT * FROM printers ORDER B
 async function hasPrinter(device: 'receipt' | 'kitchen'): Promise<boolean> {
   const row = await db.one(`SELECT 1 AS ok FROM printers WHERE device=$1 AND enabled LIMIT 1`, [device])
   return Boolean(row)
+}
+
+/** PowerShell tam yolu: PATH kısa olduğunda (çift tıklanan .bat) da çalışsın. */
+function powershellPath(): string {
+  const root = process.env.SystemRoot ?? process.env.windir ?? 'C:\\Windows'
+  const full = path.join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+  return existsSync(full) ? full : 'powershell.exe'
 }
 
 /** HTTP hata yardımcısı: setErrorHandler statusCode'a bakar. */
@@ -1547,7 +1554,7 @@ export async function registerRoutes(app: FastifyInstance) {
       if (process.platform !== 'win32') return { mode, available: false, printers: [], reason: 'Sunucu Windows değil' }
       try {
         const { stdout } = await promisify(execFile)(
-          'powershell.exe',
+          powershellPath(),
           ['-NoProfile', '-NonInteractive', '-Command',
             'Get-Printer | Select-Object Name,DriverName,PortName,PrinterStatus | ConvertTo-Json -Compress'],
           { timeout: 12000, windowsHide: true },
@@ -1562,7 +1569,11 @@ export async function registerRoutes(app: FastifyInstance) {
         }))
         return { mode, available: true, printers }
       } catch (err: any) {
-        return { mode, available: false, printers: [], reason: String(err.message ?? err).slice(0, 200) }
+        const raw = String(err?.message ?? err)
+      const reason = /ENOENT/.test(raw)
+        ? 'PowerShell bulunamadı — yazıcı adını elle yazabilirsiniz'
+        : raw.slice(0, 200)
+      return { mode, available: false, printers: [], reason }
       }
     })
   })

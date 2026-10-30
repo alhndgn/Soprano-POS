@@ -22,12 +22,20 @@ import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
 import { mkdir, writeFile, unlink } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { buildKot, buildReceipt, trAscii, type KotPayload, type ReceiptPayload } from '../server/print/escpos.ts'
 import { charsForWidth, parseNetworkAddress } from '../server/print/routing.ts'
 
 const execFileAsync = promisify(execFile)
+
+/** PowerShell tam yolu: PATH kısa olduğunda da USB yazıcı çalışsın. */
+function powershellPath(): string {
+  const root = process.env.SystemRoot ?? process.env.windir ?? 'C:\\Windows'
+  const full = path.join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+  return existsSync(full) ? full : 'powershell.exe'
+}
 const API = process.env.SOPRANO_API ?? 'http://127.0.0.1:8095'
 const BRIDGE_TOKEN = process.env.BRIDGE_TOKEN
 const authHeaders: Record<string, string> = BRIDGE_TOKEN ? { 'x-bridge-token': BRIDGE_TOKEN } : {}
@@ -61,7 +69,7 @@ async function sendWindows(printerName: string, data: Buffer, jobId: number): Pr
   const script = path.join(process.cwd(), 'scripts', 'raw-print.ps1')
   try {
     await execFileAsync(
-      'powershell.exe',
+      powershellPath(),
       ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script, '-PrinterName', printerName, '-FilePath', file],
       { timeout: 25000, windowsHide: true },
     )
