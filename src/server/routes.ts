@@ -79,6 +79,12 @@ type LineRow = {
   ingredients: { name: string; price: number; mode: 'removed' | 'added' }[]
 }
 
+/** Fiş/KOT başlığı: masada ise masa adı, gel al ise müşteri adı. */
+function orderLabel(o: { order_type?: string | null; table_name?: string | null; customer_name?: string | null }): string {
+  if (o.order_type === 'takeaway') return o.customer_name ? `Gel Al - ${o.customer_name}` : 'Gel Al'
+  return o.table_name ?? 'Paket'
+}
+
 async function loadOrder(orderId: number) {
   const order = await db.one<any>(
     `SELECT o.*, t.name AS table_name, u.name AS staff_name
@@ -216,7 +222,8 @@ export async function registerRoutes(app: FastifyInstance) {
          FROM tables WHERE active = true ORDER BY sort, id`,
       )
       const openOrders = await db.all<any>(
-        `SELECT o.id, o.table_id, o.guest_count, o.opened_at, o.status,
+        `SELECT o.id, o.table_id, o.order_type, o.customer_name, o.customer_phone,
+                o.guest_count, o.opened_at, o.status,
                 COALESCE(SUM((ol.unit_price
                   + COALESCE((SELECT SUM(lm.price) FROM line_modifiers lm WHERE lm.line_id = ol.id), 0)
                   + COALESCE((SELECT SUM(li.price) FROM line_ingredients li WHERE li.line_id = ol.id AND li.mode = 'added'), 0)
@@ -244,11 +251,13 @@ export async function registerRoutes(app: FastifyInstance) {
       const pmg = await db.all<any>(`SELECT product_id, group_id FROM product_modifier_groups`)
       const shift = await openShift()
 
-      const orderByTable = new Map(openOrders.map((o) => [o.table_id, o]))
+      const orderByTable = new Map(openOrders.filter((o) => o.table_id).map((o) => [o.table_id, o]))
       return {
         me,
         outlet: outlet?.value ?? {},
         shift,
+        // Masaya bağlı olmayan gel al adisyonları
+        takeaway: openOrders.filter((o) => o.order_type === 'takeaway'),
         floors: floors.map((f) => ({
           ...f,
           tables: tables
@@ -325,9 +334,35 @@ export async function registerRoutes(app: FastifyInstance) {
 
     // ---------- adisyon ----------
     scope.post('/api/orders', async (req) => {
-      const { tableId, guestCount = 1, note } = z
-        .object({ tableId: z.number().int().positive(), guestCount: z.number().int().min(1).max(30).default(1), note: z.string().max(200).optional() })
+      const { tableId, guestCount = 1, note, orderType = 'dine_in', customerName, customerPhone } = z
+        .object({
+          tableId: z.number().int().positive().nullish(),
+          guestCount: z.number().int().min(1).max(30).default(1),
+          note: z.string().max(200).optional(),
+          orderType: z.enum(['dine_in', 'takeaway']).default('dine_in'),
+          customerName: z.string().trim().max(60).optional(),
+          customerPhone: z.string().trim().max(24).optional(),
+        })
         .parse(req.body)
+
+      const shift = await openShift()
+
+      // ---- Gel al: masa yok, müşteri adı/telefon opsiyonel ----
+      if (orderType === 'takeaway') {
+        const order = await db.one<any>(
+          `INSERT INTO orders (table_id, shift_id, opened_by, guest_count, note, order_type, customer_name, customer_phone)
+           VALUES (NULL,$1,$2,1,$3,'takeaway',$4,$5) RETURNING *`,
+          [shift?.id ?? null, user(req).id, note ?? null, customerName || null, customerPhone || null],
+        )
+        broadcast()
+        return order
+      }
+
+      if (!tableId) {
+        const e: any = new Error('Masa seçilmedi')
+        e.statusCode = 400
+        throw e
+      }
       const table = await db.one(`SELECT id FROM tables WHERE id=$1 AND active=true`, [tableId])
       if (!table) {
         const e: any = new Error('Masa bulunamadı')
@@ -336,9 +371,8 @@ export async function registerRoutes(app: FastifyInstance) {
       }
       const existing = await db.one<{ id: number }>(`SELECT id FROM orders WHERE table_id=$1 AND status='open'`, [tableId])
       if (existing) return { id: existing.id, existing: true }
-      const shift = await openShift()
       const order = await db.one<any>(
-        `INSERT INTO orders (table_id, shift_id, opened_by, guest_count, note) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+        `INSERT INTO orders (table_id, shift_id, opened_by, guest_count, note, order_type) VALUES ($1,$2,$3,$4,$5,'dine_in') RETURNING *`,
         [tableId, shift?.id ?? null, user(req).id, guestCount, note ?? null],
       )
       broadcast()
@@ -462,7 +496,8 @@ export async function registerRoutes(app: FastifyInstance) {
         await db.one(`UPDATE order_lines SET status='void' WHERE id=$1 RETURNING id`, [lineId])
         if (await hasPrinter('kitchen')) {
           const order = await db.one<any>(
-            `SELECT o.id, t.name AS table_name FROM orders o LEFT JOIN tables t ON t.id=o.table_id WHERE o.id=$1`,
+            `SELECT o.id, o.order_type, o.customer_name, t.name AS table_name
+             FROM orders o LEFT JOIN tables t ON t.id=o.table_id WHERE o.id=$1`,
             [line.order_id],
           )
           await db.one(
@@ -471,7 +506,7 @@ export async function registerRoutes(app: FastifyInstance) {
               line.order_id,
               JSON.stringify({
                 orderId: line.order_id,
-                tableName: order?.table_name ?? 'Paket',
+                tableName: order ? orderLabel(order) : 'Paket',
                 staffName: user(req).name,
                 timeISO: new Date().toISOString(),
                 scope: 'line',
@@ -513,7 +548,7 @@ export async function registerRoutes(app: FastifyInstance) {
           id,
           JSON.stringify({
             orderId: order.id,
-            tableName: order.table_name ?? 'Paket',
+            tableName: orderLabel(order),
             staffName: order.staff_name,
             timeISO: new Date().toISOString(),
             lines: newLines.map((l: LineRow) => ({
@@ -597,7 +632,7 @@ export async function registerRoutes(app: FastifyInstance) {
             id,
             JSON.stringify({
               orderId: id,
-              tableName: order.table_name ?? 'Paket',
+              tableName: orderLabel(order),
               staffName: user(req).name,
               timeISO: new Date().toISOString(),
               scope: 'order',
@@ -758,7 +793,7 @@ export async function registerRoutes(app: FastifyInstance) {
               JSON.stringify({
                 outletName: meta.name ?? 'Soprano',
                 orderId: order.id,
-                tableName: order.table_name ?? 'Paket',
+                tableName: orderLabel(order),
                 staffName: user(req).name,
                 customerName: customerName ?? order.customer_name ?? null,
                 discount: { type: requestedDiscount.type, value: requestedDiscount.value, amount: appliedDiscount },
@@ -841,8 +876,23 @@ export async function registerRoutes(app: FastifyInstance) {
          ) x`,
         [day],
       )
+      const byType = await db.all<any>(
+        `SELECT x.order_type, count(*)::int AS orders,
+                COALESCE(SUM(GREATEST(x.gross_total - x.discount_amount, 0)), 0)::int AS revenue
+         FROM (
+           SELECT o.id, o.order_type, o.discount_amount,
+             COALESCE((SELECT SUM((ol.unit_price
+               + COALESCE((SELECT SUM(lm.price) FROM line_modifiers lm WHERE lm.line_id=ol.id),0)
+               + COALESCE((SELECT SUM(li.price) FROM line_ingredients li WHERE li.line_id=ol.id AND li.mode='added'),0)
+             ) * ol.qty) FROM order_lines ol WHERE ol.order_id=o.id AND ol.status<>'void'),0)::int AS gross_total
+           FROM orders o
+           WHERE o.status='paid' AND o.closed_at::date = $1::date
+         ) x
+         GROUP BY x.order_type`,
+        [day],
+      )
       const paidOrders = await db.all<any>(
-        `SELECT o.id AS order_id, t.name AS table_name, o.customer_name, o.discount_amount,
+        `SELECT o.id AS order_id, o.order_type, t.name AS table_name, o.customer_name, o.discount_amount,
                 GREATEST(o.gross_total - o.discount_amount, 0)::int AS total,
                 COALESCE((SELECT string_agg(DISTINCT p.method, ', ' ORDER BY p.method)
                           FROM payments p WHERE p.order_id=o.id), '') AS payment_methods,
@@ -898,6 +948,7 @@ export async function registerRoutes(app: FastifyInstance) {
         discountTotal: orderCount?.discount_total ?? 0,
         paidOrders,
         voidedOrders,
+        byType,
         topProducts,
         hourly,
       }

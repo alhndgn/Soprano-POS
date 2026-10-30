@@ -148,6 +148,11 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_value integer NOT NULL DEFA
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount integer NOT NULL DEFAULT 0;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS discounted_by integer REFERENCES users(id);
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS discounted_at timestamptz;
+-- Gel al / paket siparişler: masa yok, müşteri adı ve telefon opsiyonel
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_type text NOT NULL DEFAULT 'dine_in';
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_phone text;
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_order_type_check;
+ALTER TABLE orders ADD CONSTRAINT orders_order_type_check CHECK (order_type IN ('dine_in','takeaway'));
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS void_reason text;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS voided_by integer REFERENCES users(id);
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS voided_at timestamptz;

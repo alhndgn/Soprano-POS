@@ -48,6 +48,20 @@ export default function Reports() {
           <div className="value">{money(avg)}</div>
         </div>
         <div className="kpi">
+          <div className="label">Masada</div>
+          <div className="value" style={{ fontSize: 19 }}>
+            {money(rep?.byType?.find((t) => t.order_type === 'dine_in')?.revenue ?? 0)}
+            <small className="kpi-sub">{rep?.byType?.find((t) => t.order_type === 'dine_in')?.orders ?? 0} adisyon</small>
+          </div>
+        </div>
+        <div className="kpi">
+          <div className="label">Gel Al</div>
+          <div className="value" style={{ fontSize: 19 }}>
+            {money(rep?.byType?.find((t) => t.order_type === 'takeaway')?.revenue ?? 0)}
+            <small className="kpi-sub">{rep?.byType?.find((t) => t.order_type === 'takeaway')?.orders ?? 0} sipariş</small>
+          </div>
+        </div>
+        <div className="kpi">
           <div className="label">İskonto</div>
           <div className="value">{money(rep?.discountTotal ?? 0)}</div>
         </div>
@@ -115,7 +129,14 @@ export default function Reports() {
                 <tbody>
                   {(rep?.paidOrders ?? []).map((row) => (
                     <tr key={row.order_id}>
-                      <td><b>#{row.order_id}</b><small>{row.table_name ?? 'Paket'}</small></td>
+                      <td>
+                        <b>#{row.order_id}</b>
+                        <small>
+                          {row.order_type === 'takeaway'
+                            ? `Gel Al${row.customer_name ? ` · ${row.customer_name}` : ''}`
+                            : row.table_name ?? 'Paket'}
+                        </small>
+                      </td>
                       <td>{reportCustomerName(row.customer_name)}</td>
                       <td>{reportPaymentLabel(row.payment_methods)}</td>
                       <td>{row.discount_amount ? money(row.discount_amount) : '—'}</td>

@@ -54,6 +54,11 @@ export default function OrderPage() {
   const menu = (boot?.menu ?? []).filter((c) => c.products.length > 0)
   const activeCat = menu.find((c) => c.id === catId) ?? menu[0]
 
+  const orderTitle = order
+    ? order.order_type === 'takeaway'
+      ? `Gel Al${order.customer_name ? ` · ${order.customer_name}` : ''}`
+      : order.table_name ?? 'Masa'
+    : ''
   const totals = order?.totals
   const canPay = me?.role === 'cashier' || me?.role === 'manager'
   const canVoid = me?.role === 'manager'
@@ -158,7 +163,8 @@ export default function OrderPage() {
             <p className="eyebrow">SİPARİŞ OLUŞTUR</p>
             <h2>{activeCat?.name}</h2>
             <div className="sub" style={{ color: 'var(--muted)', fontSize: 12.5, marginTop: 4 }}>
-              {order.table_name ?? 'Masa'} · {order.guest_count} kişi · {elapsed(order.opened_at)}
+              {orderTitle}
+              {order.order_type === 'takeaway' ? ' · paket' : ` · ${order.guest_count} kişi`} · {elapsed(order.opened_at)}
             </div>
           </div>
           <button className="btn ghost sm" onClick={() => navigate('/tables')}>
@@ -223,6 +229,10 @@ export default function OrderPage() {
           <div>
             <p className="panel-kicker">AKTİF ADİSYON</p>
             <h2>Adisyon #{order.id}</h2>
+            <div className="cart-order-label">
+              {order.order_type === 'takeaway' && <span className="takeaway-badge">GEL AL</span>}
+              {orderTitle}
+            </div>
             <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 3 }}>
               {order.staff_name} · {order.lines.length} satır
               {order.lines.some((l) => l.status === 'new')

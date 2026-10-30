@@ -26,7 +26,10 @@ export type Product = {
 export type Category = { id: number; name: string; emoji: string; products: Product[] }
 export type OpenOrder = {
   id: number
-  table_id: number
+  table_id: number | null
+  order_type: 'dine_in' | 'takeaway'
+  customer_name: string | null
+  customer_phone: string | null
   guest_count: number
   opened_at: string
   total: number
@@ -67,6 +70,8 @@ export type Bootstrap = {
   outlet: { name?: string; footer?: string; address?: string; phone?: string }
   shift: Shift
   floors: Floor[]
+  /** Masaya bağlı olmayan gel al adisyonları */
+  takeaway: OpenOrder[]
   menu: Category[]
 }
 
@@ -155,7 +160,9 @@ export type Order = {
   note: string | null
   opened_at: string
   closed_at: string | null
+  order_type: 'dine_in' | 'takeaway'
   customer_name: string | null
+  customer_phone: string | null
   discount: Discount
   lines: OrderLine[]
   payments: { id: number; method: string; amount: number; tendered: number; change_amount: number }[]
@@ -242,6 +249,8 @@ export const api = {
   openShift: (openingFloat = 0) => request('POST', '/api/shift/open', { openingFloat }),
   closeShift: (closingCount: number) => request('POST', '/api/shift/close', { closingCount }),
   createOrder: (tableId: number, guestCount = 1) => request<{ id: number }>('POST', '/api/orders', { tableId, guestCount }),
+  createTakeaway: (body: { customerName?: string; customerPhone?: string; note?: string }) =>
+    request<{ id: number }>('POST', '/api/orders', { ...body, orderType: 'takeaway' }),
   order: (id: number) => request<Order>('GET', `/api/orders/${id}`),
   addLine: (
     orderId: number,
@@ -276,8 +285,10 @@ export const api = {
       orders: number
       byMethod: { method: string; amount: number; count: number }[]
       discountTotal: number
+      byType: { order_type: 'dine_in' | 'takeaway'; orders: number; revenue: number }[]
       paidOrders: {
         order_id: number
+        order_type: 'dine_in' | 'takeaway'
         table_name: string | null
         customer_name: string | null
         discount_amount: number

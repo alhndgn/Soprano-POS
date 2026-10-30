@@ -21,6 +21,9 @@ export default function Tables() {
   const [busy, setBusy] = useState<number | null>(null)
   const [moveOpen, setMoveOpen] = useState<{ orderId: number; tableId: number; tableName: string } | null>(null)
   const [moving, setMoving] = useState(false)
+  const [takeawayOpen, setTakeawayOpen] = useState(false)
+  const [takeawayForm, setTakeawayForm] = useState({ name: '', phone: '' })
+  const [takeawayBusy, setTakeawayBusy] = useState(false)
 
   const floors = boot?.floors ?? []
   const active = floors.find((f) => f.id === floorId) ?? floors[0]
@@ -28,21 +31,43 @@ export default function Tables() {
   const stats = useMemo(() => {
     const all = floors.flatMap((f) => f.tables)
     const busyTables = all.filter((t) => t.order)
+    const takeawayTotal = (boot?.takeaway ?? []).reduce((s, o) => s + o.total, 0)
     return {
       total: all.length,
       busy: busyTables.length,
-      open: busyTables.reduce((s, t) => s + (t.order?.total ?? 0), 0),
+      open: busyTables.reduce((s, t) => s + (t.order?.total ?? 0), 0) + takeawayTotal,
+      takeaway: boot?.takeaway?.length ?? 0,
     }
-  }, [floors])
+  }, [floors, boot?.takeaway])
 
-  const openOrders = useMemo(
-    () =>
-      floors
-        .flatMap((f) => f.tables.map((t) => ({ ...t, floor: f.name })))
-        .filter((t) => t.order)
-        .sort((a, b) => (a.order!.opened_at < b.order!.opened_at ? -1 : 1)),
-    [floors],
-  )
+  const openOrders = useMemo(() => {
+    const fromTables = floors
+      .flatMap((f) => f.tables.map((t) => ({ ...t, floor: f.name })))
+      .filter((t) => t.order)
+      .map((t) => ({
+        key: `table-${t.id}`,
+        orderId: t.order!.id,
+        tableId: t.id as number | null,
+        title: t.name,
+        subtitle: `${t.floor} · ${t.order!.guest_count} kişi`,
+        total: t.order!.total,
+        sentLines: t.order!.sent_lines,
+        openedAt: t.order!.opened_at,
+        takeaway: false,
+      }))
+    const fromTakeaway = (boot?.takeaway ?? []).map((o) => ({
+      key: `takeaway-${o.id}`,
+      orderId: o.id,
+      tableId: null as number | null,
+      title: o.customer_name ? `Gel Al · ${o.customer_name}` : 'Gel Al',
+      subtitle: o.customer_phone ? `Gel Al · ${o.customer_phone}` : 'Gel Al · paket',
+      total: o.total,
+      sentLines: o.sent_lines,
+      openedAt: o.opened_at,
+      takeaway: true,
+    }))
+    return [...fromTables, ...fromTakeaway].sort((a, b) => (a.openedAt < b.openedAt ? -1 : 1))
+  }, [floors, boot?.takeaway])
 
   const openTable = async (tableId: number, existingOrderId?: number) => {
     if (existingOrderId) return navigate(`/order/${existingOrderId}`)
@@ -77,6 +102,9 @@ export default function Tables() {
           <div className="sub">Salon durumunu tek bakışta takip et, masaya dokunarak adisyonu aç.</div>
         </div>
         <div className="head-actions">
+          <button type="button" className="btn primary" onClick={() => setTakeawayOpen(true)}>
+            + Gel Al
+          </button>
           <div className="head-stat"><span>Dolu masa</span><b>{stats.busy}<small>/{stats.total}</small></b></div>
           <div className="head-stat"><span>Açık adisyon</span><b>{money(stats.open)}</b></div>
           {boot?.shift ? (
@@ -172,30 +200,35 @@ export default function Tables() {
           <div className="side-list">
             {openOrders.length === 0 && <div className="kds-empty">Açık adisyon yok</div>}
             {openOrders.map((t) => (
-              <div key={t.id} className="open-row">
-                <button className="open-row-main" onClick={() => navigate(`/order/${t.order!.id}`)}>
+              <div key={t.key} className={`open-row${t.takeaway ? ' is-takeaway' : ''}`}>
+                <button className="open-row-main" onClick={() => navigate(`/order/${t.orderId}`)}>
                   <div>
-                    <b>{t.name}</b>
+                    <b>
+                      {t.takeaway && <span className="takeaway-badge">GEL AL</span>}
+                      {t.takeaway ? t.title.replace('Gel Al · ', '') : t.title}
+                    </b>
                     <small>
-                      {t.floor} · {t.order!.guest_count} kişi · {elapsed(t.order!.opened_at)}
+                      {t.subtitle} · {elapsed(t.openedAt)}
                     </small>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div className="open-row-total">{money(t.order!.total)}</div>
-                    <small style={{ color: t.order!.sent_lines ? 'var(--ok)' : 'var(--accent-2)' }}>
-                      {t.order!.sent_lines ? 'mutfakta' : 'gönderilmedi'}
+                    <div className="open-row-total">{money(t.total)}</div>
+                    <small style={{ color: t.sentLines ? 'var(--ok)' : 'var(--accent-2)' }}>
+                      {t.sentLines ? 'mutfakta' : 'gönderilmedi'}
                     </small>
                   </div>
                 </button>
-                <button
-                  type="button"
-                  className="open-row-move"
-                  aria-label={`${t.name} adisyonunu taşı`}
-                  title="Adisyonu başka masaya taşı"
-                  onClick={() => setMoveOpen({ orderId: t.order!.id, tableId: t.id, tableName: t.name })}
-                >
-                  ↔
-                </button>
+                {t.tableId && (
+                  <button
+                    type="button"
+                    className="open-row-move"
+                    aria-label={`${t.title} adisyonunu taşı`}
+                    title="Adisyonu başka masaya taşı"
+                    onClick={() => setMoveOpen({ orderId: t.orderId, tableId: t.tableId!, tableName: t.title })}
+                  >
+                    ↔
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -205,6 +238,64 @@ export default function Tables() {
           </div>
         </aside>
       </div>
+
+      {takeawayOpen && (
+        <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && setTakeawayOpen(false)}>
+          <div className="modal takeaway-modal" role="dialog" aria-modal="true" aria-label="Gel al siparişi aç">
+            <p className="eyebrow">GEL AL</p>
+            <h3>Paket / gel al siparişi</h3>
+            <div className="sub">Müşteri adı zorunlu değil; fişte ve mutfak KOT'unda görünür.</div>
+            <label className="field" style={{ marginTop: 14 }}>
+              <span>Müşteri adı (opsiyonel)</span>
+              <input
+                className="input"
+                value={takeawayForm.name}
+                maxLength={60}
+                autoFocus
+                placeholder="Örn. Ahmet"
+                onChange={(e) => setTakeawayForm({ ...takeawayForm, name: e.target.value })}
+              />
+            </label>
+            <label className="field">
+              <span>Telefon (opsiyonel)</span>
+              <input
+                className="input"
+                value={takeawayForm.phone}
+                maxLength={24}
+                placeholder="05xx xxx xx xx"
+                onChange={(e) => setTakeawayForm({ ...takeawayForm, phone: e.target.value })}
+              />
+            </label>
+            <div className="modal-actions">
+              <button type="button" className="btn" onClick={() => setTakeawayOpen(false)} disabled={takeawayBusy}>
+                Vazgeç
+              </button>
+              <button
+                type="button"
+                className="btn primary"
+                disabled={takeawayBusy}
+                onClick={async () => {
+                  setTakeawayBusy(true)
+                  try {
+                    const res = await api.createTakeaway({
+                      customerName: takeawayForm.name.trim() || undefined,
+                      customerPhone: takeawayForm.phone.trim() || undefined,
+                    })
+                    await refresh()
+                    setTakeawayOpen(false)
+                    setTakeawayForm({ name: '', phone: '' })
+                    navigate(`/order/${res.id}`)
+                  } finally {
+                    setTakeawayBusy(false)
+                  }
+                }}
+              >
+                {takeawayBusy ? 'Açılıyor…' : 'Siparişi aç'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {moveOpen && (
         <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && setMoveOpen(null)}>
