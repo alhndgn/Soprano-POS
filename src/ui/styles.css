@@ -252,6 +252,15 @@ small { font-size: 12px; }
 /* masa ekranı: solda plan, sağda açık adisyon rayı */
 .tables-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
 .side-panel { display: flex; flex-direction: column; overflow: hidden; }
+.side-stack { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 18px; min-width: 0; }
+.side-stack .side-panel { position: static; }
+.takeaway-panel { border-color: var(--warn-line); }
+.takeaway-panel .panel-head { background: linear-gradient(180deg, var(--warn-soft), var(--panel) 85%); }
+.takeaway-head-actions { display: flex; align-items: center; gap: 8px; }
+.takeaway-list { max-height: 30vh; }
+.takeaway-total { background: var(--warn-soft); border-top-color: var(--warn-line); color: var(--warn); }
+.takeaway-total b { color: var(--warn); }
+.takeaway-panel .kds-empty { display: flex; flex-direction: column; align-items: center; gap: 9px; }
 .side-list { padding: 8px 10px; display: flex; flex-direction: column; gap: 7px; max-height: 52vh; overflow-y: auto; }
 .open-row {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;

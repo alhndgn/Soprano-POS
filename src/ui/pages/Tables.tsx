@@ -31,43 +31,52 @@ export default function Tables() {
   const stats = useMemo(() => {
     const all = floors.flatMap((f) => f.tables)
     const busyTables = all.filter((t) => t.order)
-    const takeawayTotal = (boot?.takeaway ?? []).reduce((s, o) => s + o.total, 0)
+    const tableOpen = busyTables.reduce((s, t) => s + (t.order?.total ?? 0), 0)
+    const takeawayOpen = (boot?.takeaway ?? []).reduce((s, o) => s + o.total, 0)
     return {
       total: all.length,
       busy: busyTables.length,
-      open: busyTables.reduce((s, t) => s + (t.order?.total ?? 0), 0) + takeawayTotal,
+      tableOpen,
+      takeawayOpen,
+      open: tableOpen + takeawayOpen,
       takeaway: boot?.takeaway?.length ?? 0,
     }
   }, [floors, boot?.takeaway])
 
-  const openOrders = useMemo(() => {
-    const fromTables = floors
-      .flatMap((f) => f.tables.map((t) => ({ ...t, floor: f.name })))
-      .filter((t) => t.order)
-      .map((t) => ({
-        key: `table-${t.id}`,
-        orderId: t.order!.id,
-        tableId: t.id as number | null,
-        title: t.name,
-        subtitle: `${t.floor} · ${t.order!.guest_count} kişi`,
-        total: t.order!.total,
-        sentLines: t.order!.sent_lines,
-        openedAt: t.order!.opened_at,
-        takeaway: false,
-      }))
-    const fromTakeaway = (boot?.takeaway ?? []).map((o) => ({
-      key: `takeaway-${o.id}`,
-      orderId: o.id,
-      tableId: null as number | null,
-      title: o.customer_name ? `Gel Al · ${o.customer_name}` : 'Gel Al',
-      subtitle: o.customer_phone ? `Gel Al · ${o.customer_phone}` : 'Gel Al · paket',
-      total: o.total,
-      sentLines: o.sent_lines,
-      openedAt: o.opened_at,
-      takeaway: true,
-    }))
-    return [...fromTables, ...fromTakeaway].sort((a, b) => (a.openedAt < b.openedAt ? -1 : 1))
-  }, [floors, boot?.takeaway])
+  const tableOrders = useMemo(
+    () =>
+      floors
+        .flatMap((f) => f.tables.map((t) => ({ ...t, floor: f.name })))
+        .filter((t) => t.order)
+        .map((t) => ({
+          key: `table-${t.id}`,
+          orderId: t.order!.id,
+          tableId: t.id as number | null,
+          title: t.name,
+          subtitle: `${t.floor} · ${t.order!.guest_count} kişi`,
+          total: t.order!.total,
+          sentLines: t.order!.sent_lines,
+          openedAt: t.order!.opened_at,
+        }))
+        .sort((a, b) => (a.openedAt < b.openedAt ? -1 : 1)),
+    [floors],
+  )
+
+  const takeawayOrders = useMemo(
+    () =>
+      (boot?.takeaway ?? [])
+        .map((o) => ({
+          key: `takeaway-${o.id}`,
+          orderId: o.id,
+          customerName: o.customer_name,
+          phone: o.customer_phone,
+          total: o.total,
+          sentLines: o.sent_lines,
+          openedAt: o.opened_at,
+        }))
+        .sort((a, b) => (a.openedAt < b.openedAt ? -1 : 1)),
+    [boot?.takeaway],
+  )
 
   const openTable = async (tableId: number, existingOrderId?: number) => {
     if (existingOrderId) return navigate(`/order/${existingOrderId}`)
@@ -189,54 +198,100 @@ export default function Tables() {
           </div>
         </div>
 
-        <aside className="side-panel panel">
-          <div className="panel-head">
-            <div>
-              <p className="panel-kicker">CANLI SERVİS</p>
-              <h3>Açık adisyonlar</h3>
-            </div>
-            <span className="pill">{openOrders.length}</span>
-          </div>
-          <div className="side-list">
-            {openOrders.length === 0 && <div className="kds-empty">Açık adisyon yok</div>}
-            {openOrders.map((t) => (
-              <div key={t.key} className={`open-row${t.takeaway ? ' is-takeaway' : ''}`}>
-                <button className="open-row-main" onClick={() => navigate(`/order/${t.orderId}`)}>
-                  <div>
-                    <b>
-                      {t.takeaway && <span className="takeaway-badge">GEL AL</span>}
-                      {t.takeaway ? t.title.replace('Gel Al · ', '') : t.title}
-                    </b>
-                    <small>
-                      {t.subtitle} · {elapsed(t.openedAt)}
-                    </small>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div className="open-row-total">{money(t.total)}</div>
-                    <small style={{ color: t.sentLines ? 'var(--ok)' : 'var(--accent-2)' }}>
-                      {t.sentLines ? 'mutfakta' : 'gönderilmedi'}
-                    </small>
-                  </div>
-                </button>
-                {t.tableId && (
-                  <button
-                    type="button"
-                    className="open-row-move"
-                    aria-label={`${t.title} adisyonunu taşı`}
-                    title="Adisyonu başka masaya taşı"
-                    onClick={() => setMoveOpen({ orderId: t.orderId, tableId: t.tableId!, tableName: t.title })}
-                  >
-                    ↔
-                  </button>
-                )}
+        <div className="side-stack">
+          <aside className="side-panel panel">
+            <div className="panel-head">
+              <div>
+                <p className="panel-kicker">CANLI SERVİS</p>
+                <h3>Açık adisyonlar</h3>
               </div>
-            ))}
-          </div>
-          <div className="side-total">
-            <span>Adisyon toplamı</span>
-            <b>{money(stats.open)}</b>
-          </div>
-        </aside>
+              <span className="pill">{tableOrders.length}</span>
+            </div>
+            <div className="side-list">
+              {tableOrders.length === 0 && <div className="kds-empty">Açık adisyon yok</div>}
+              {tableOrders.map((t) => (
+                <div key={t.key} className="open-row">
+                  <button className="open-row-main" onClick={() => navigate(`/order/${t.orderId}`)}>
+                    <div>
+                      <b>{t.title}</b>
+                      <small>
+                        {t.subtitle} · {elapsed(t.openedAt)}
+                      </small>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div className="open-row-total">{money(t.total)}</div>
+                      <small style={{ color: t.sentLines ? 'var(--ok)' : 'var(--accent-2)' }}>
+                        {t.sentLines ? 'mutfakta' : 'gönderilmedi'}
+                      </small>
+                    </div>
+                  </button>
+                  {t.tableId && (
+                    <button
+                      type="button"
+                      className="open-row-move"
+                      aria-label={`${t.title} adisyonunu taşı`}
+                      title="Adisyonu başka masaya taşı"
+                      onClick={() => setMoveOpen({ orderId: t.orderId, tableId: t.tableId!, tableName: t.title })}
+                    >
+                      ↔
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="side-total">
+              <span>Masa adisyonları</span>
+              <b>{money(stats.tableOpen)}</b>
+            </div>
+          </aside>
+
+          <aside className="side-panel panel takeaway-panel">
+            <div className="panel-head">
+              <div>
+                <p className="panel-kicker">PAKET / GEL AL</p>
+                <h3>Gel Al siparişleri</h3>
+              </div>
+              <div className="takeaway-head-actions">
+                <span className="pill warn">{takeawayOrders.length}</span>
+                <button type="button" className="btn sm" onClick={() => setTakeawayOpen(true)}>
+                  + Yeni
+                </button>
+              </div>
+            </div>
+            <div className="side-list takeaway-list">
+              {takeawayOrders.length === 0 && (
+                <div className="kds-empty">
+                  Gel al siparişi yok.
+                  <button type="button" className="btn ghost sm" onClick={() => setTakeawayOpen(true)}>
+                    + Gel Al aç
+                  </button>
+                </div>
+              )}
+              {takeawayOrders.map((t) => (
+                <div key={t.key} className="open-row is-takeaway">
+                  <button className="open-row-main" onClick={() => navigate(`/order/${t.orderId}`)}>
+                    <div>
+                      <b>{t.customerName ?? 'İsimsiz müşteri'}</b>
+                      <small>
+                        #{t.orderId} · {t.phone ? t.phone : 'telefon yok'} · {elapsed(t.openedAt)}
+                      </small>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div className="open-row-total">{money(t.total)}</div>
+                      <small style={{ color: t.sentLines ? 'var(--ok)' : 'var(--accent-2)' }}>
+                        {t.sentLines ? 'mutfakta' : 'gönderilmedi'}
+                      </small>
+                    </div>
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="side-total takeaway-total">
+              <span>Gel al toplamı</span>
+              <b>{money(stats.takeawayOpen)}</b>
+            </div>
+          </aside>
+        </div>
       </div>
 
       {takeawayOpen && (
