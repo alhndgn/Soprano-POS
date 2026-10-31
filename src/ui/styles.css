@@ -1209,6 +1209,10 @@ small { font-size: 12px; }
 .printer-found-row:hover { border-color: var(--accent-line); background: var(--accent-soft); }
 .printer-found-row b { font-size: 12.5px; }
 .printer-found-row small { color: var(--muted); font-size: 11px; }
+.printer-help { display: flex; flex-direction: column; gap: 6px; padding: 11px 12px; border: 1px solid var(--warn-line); border-radius: 11px; background: var(--warn-soft); color: var(--warn); }
+.printer-help b { font-size: 12.5px; }
+.printer-help p { margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--warn); opacity: .92; }
+.printer-help-detail { font-family: ui-monospace, monospace; font-size: 10.5px; opacity: .75; word-break: break-word; }
 
 .printer-jobs { padding: 18px 20px 8px; }
 .job-status { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; border: 1px solid var(--line-strong); background: var(--bg); color: var(--muted); }

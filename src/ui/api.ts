@@ -380,7 +380,7 @@ export const api = {
   deletePrinter: (id: number) => request<{ ok: boolean }>('DELETE', `/api/admin/printers/${id}`),
   testPrinter: (id: number) => request<{ job: { id: number }; printer: Printer }>('POST', `/api/admin/printers/${id}/test`, {}),
   detectPrinters: (mode: 'windows' | 'network' = 'windows') =>
-    request<{ mode: string; available?: boolean; reason?: string; printers?: DetectedPrinter[]; candidates?: LanPrinter[] }>(
+    request<{ mode: string; available?: boolean; reason?: string; via?: string; printers?: DetectedPrinter[]; candidates?: LanPrinter[] }>(
       'GET',
       `/api/admin/printers/detect?mode=${mode}`,
     ),

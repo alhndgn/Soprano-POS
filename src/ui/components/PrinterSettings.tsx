@@ -316,7 +316,15 @@ export default function PrinterSettings({ onError, onOk }: { onError: (m: string
                     </p>
                   )}
                   {detected.note && (
-                    <p className="printer-found-note">Sorun: {detected.note}</p>
+                    <div className="printer-help">
+                      <b>Yazıcı listesi alınamadı</b>
+                      <p>
+                        Yolu: <b>Ayarlar → Bluetooth ve cihazlar → Yazıcılar ve tarayıcılar</b>. Oradaki adı
+                        kopyalayıp yukarıdaki “Windows yazıcı adı” alanına elle yazabilirsin — liste olmadan da
+                        yazdırma çalışır.
+                      </p>
+                      <p className="printer-help-detail">{detected.note}</p>
+                    </div>
                   )}
                 </div>
               )}

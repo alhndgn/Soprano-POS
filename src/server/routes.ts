@@ -1682,27 +1682,11 @@ export async function registerRoutes(app: FastifyInstance) {
       if (mode === 'network') return { mode, candidates: await scanLanPrinters() }
       if (process.platform !== 'win32') return { mode, available: false, printers: [], reason: 'Sunucu Windows değil' }
       try {
-        const { stdout } = await promisify(execFile)(
-          powershellPath(),
-          ['-NoProfile', '-NonInteractive', '-Command',
-            'Get-Printer | Select-Object Name,DriverName,PortName,PrinterStatus | ConvertTo-Json -Compress'],
-          { timeout: 12000, windowsHide: true },
-        )
-        const raw = stdout.trim()
-        const parsed = raw ? JSON.parse(raw) : []
-        const printers = (Array.isArray(parsed) ? parsed : [parsed]).map((p: any) => ({
-          name: String(p.Name ?? ''),
-          driver: String(p.DriverName ?? ''),
-          port: String(p.PortName ?? ''),
-          status: String(p.PrinterStatus ?? ''),
-        }))
-        return { mode, available: true, printers }
+        const { printers, via } = await detectWindowsPrinters()
+        return { mode, available: true, via, printers }
       } catch (err: any) {
-        const raw = String(err?.message ?? err)
-      const reason = /ENOENT/.test(raw)
-        ? 'PowerShell bulunamadı — yazıcı adını elle yazabilirsiniz'
-        : raw.slice(0, 200)
-      return { mode, available: false, printers: [], reason }
+        const reason = String(err?.message ?? err).slice(0, 220)
+        return { mode, available: false, printers: [], reason }
       }
     })
   })
@@ -1780,6 +1764,98 @@ export async function registerRoutes(app: FastifyInstance) {
       return { ok: true }
     })
   })
+}
+
+type DetectedPrinter = { name: string; driver: string; port: string; status: string }
+
+/** Yazıcı kayıt defteri anahtarı — kaçış hatasını önlemek için parçalardan kurulur. */
+const REG_PRINTERS_KEY = ['HKLM', 'SOFTWARE', 'Microsoft', 'Windows NT', 'CurrentVersion', 'Print', 'Printers'].join('\\')
+
+/** PowerShell çıktısını JSON olarak alır; hata olursa stderr'in ilk satırını fırlatır. */
+async function runPsJson(command: string): Promise<any[]> {
+  try {
+    const { stdout } = await promisify(execFile)(
+      powershellPath(),
+      ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', command],
+      { timeout: 15000, windowsHide: true },
+    )
+    const raw = stdout.replace(/^\uFEFF/, '').trim()
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : [parsed]
+  } catch (err: any) {
+    const stderr = String(err?.stderr ?? '').trim()
+    const first = stderr.split(/\r?\n/).find((l: string) => l.trim()) ?? String(err?.message ?? err)
+    throw new Error(first.replace(/^\s*\+?\s*CategoryInfo.*$/, '').slice(0, 160))
+  }
+}
+
+/**
+ * Kurulu Windows yazıcılarını üç yolla dener:
+ *   1) Get-Printer (PrintManagement modülü)
+ *   2) Get-CimInstance Win32_Printer (modül gerekmez, her Win10'da var)
+ *   3) Kayıt defteri (reg.exe) — yalnızca isim listesi
+ * Biri tutarsa döner; hiçbiri tutmazsa anlaşılır hata verir.
+ */
+async function detectWindowsPrinters(): Promise<{ printers: DetectedPrinter[]; via: string }> {
+  const errors: string[] = []
+
+  const map = (rows: any[], nameKey = 'Name'): DetectedPrinter[] =>
+    rows
+      .map((r) => ({
+        name: String(r?.[nameKey] ?? r?.Name ?? '').trim(),
+        driver: String(r?.DriverName ?? '').trim(),
+        port: String(r?.PortName ?? '').trim(),
+        status: String(r?.PrinterStatus ?? '').trim(),
+      }))
+      .filter((p) => p.name)
+
+  try {
+    const rows = await runPsJson(
+      'Get-Printer | Select-Object Name,DriverName,PortName,PrinterStatus | ConvertTo-Json -Compress',
+    )
+    const printers = map(rows)
+    if (printers.length) return { printers, via: 'Get-Printer' }
+    errors.push('Get-Printer: yazıcı döndürmedi')
+  } catch (e: any) {
+    errors.push(`Get-Printer: ${e.message}`)
+  }
+
+  try {
+    const rows = await runPsJson(
+      'Get-CimInstance -ClassName Win32_Printer | Select-Object Name,DriverName,PortName,PrinterStatus | ConvertTo-Json -Compress',
+    )
+    const printers = map(rows)
+    if (printers.length) return { printers, via: 'Win32_Printer' }
+    errors.push('Win32_Printer: yazıcı döndürmedi')
+  } catch (e: any) {
+    errors.push(`Win32_Printer: ${e.message}`)
+  }
+
+  try {
+    const { stdout } = await promisify(execFile)(
+      'reg.exe',
+      ['query', REG_PRINTERS_KEY],
+      { timeout: 10000, windowsHide: true },
+    )
+    // reg, alt anahtarları tam yol olarak döndürür (HKEY_LOCAL_MACHINE\...\Printers\<ad>).
+    // Kök satırı çıktıdan al: sorgu HKLM kısaltmasıyla yapılsa da çıktı tam adı yazar.
+    const rows = stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+    const root = rows.find((line) => line.startsWith('HKEY_')) ?? ''
+    const sep = String.fromCharCode(92)
+    const prefix = root + sep
+    const printers = rows
+      .filter((line) => line.startsWith(prefix) && !line.slice(prefix.length).includes(sep))
+      .map((line) => line.slice(prefix.length))
+      .filter((name) => !/^(Connections|PrinterDefaults|PrinterPorts|Providers|Environments)$/i.test(name))
+      .map((name) => ({ name, driver: '', port: '', status: '' }))
+    if (printers.length) return { printers, via: 'kayıt defteri' }
+    errors.push('kayıt defteri: kayıt yok')
+  } catch (e: any) {
+    errors.push(`kayıt defteri: ${String(e?.message ?? e).slice(0, 80)}`)
+  }
+
+  throw new Error(`Yazıcı listesi alınamadı (${errors.join(' | ')})`)
 }
 
 /** Yerel ağdaki 9100 portu açık yazıcıları tarar (LAN keşfi). */
