@@ -4,7 +4,8 @@ title Soprano Yazici Koprusu
 
 setlocal
 
-set "APP=C:\dev\projeler\soprano"
+set "APP=%~dp0"
+if "%APP:~-1%"=="\" set "APP=%APP:~0,-1%"
 cd /d "%APP%" 2>nul
 if errorlevel 1 (
   echo HATA: Soprano klasoru bulunamadi: %APP%

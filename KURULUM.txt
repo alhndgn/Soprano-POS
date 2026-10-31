@@ -1,0 +1,101 @@
+SOPRANO POS — KURULUM VE TAŞIMA
+================================
+
+Bu klasörü başka bir bilgisayarda çalıştırmak için gereken her şey içinde.
+Kurulum için internet gerekir (paketler ilk seferde indirilir).
+
+
+1) NELER GEREKLİ
+----------------
+- Windows 10 veya 11 (64 bit)
+- Node.js LTS: https://nodejs.org  (kurulumda "Add to PATH" işaretli kalsın)
+- İnternet (yalnızca ilk kurulumda)
+
+
+2) KURULUM (5 dakika)
+---------------------
+1. Bu ZIP'i hedef bilgisayarda bir klasöre çıkar. Öneri:  C:\Soprano
+   (Türkçe karakterli veya çok uzun yollar sorun çıkarabilir.)
+2. Klasördeki  Kur.bat  dosyasına çift tıkla.
+   - Paketleri indirir, arayüzü derler.
+   - Sonunda "KURULUM TAMAM" yazar.
+3. Soprano POS.bat  dosyasına çift tıkla.
+   - Siyah pencere (sunucu) + küçültülmüş "Soprano Yazici" penceresi açılır.
+   - 6 saniye sonra tarayıcı açılır: http://localhost:8095
+   - Giriş PIN'leri: 1234 yönetici / 1111 garson / 2222 kasiyer
+
+Bu iki pencere açık kaldığı sürece kasa çalışır.
+
+
+3) KAPATMA
+----------
+- Soprano Kapat.bat  (masaüstü kısayolu) → sunucu + yazıcı köprüsü kapanır.
+- veya sunucu penceresinde Ctrl+C, sonra pencereyi kapat.
+
+
+4) YAZICI AYARI (bir kez)
+-------------------------
+Yönetim > Yazıcılar:
+
+  Mutfak fişi (KOT)
+    - Ağ (LAN) seç → "Ağda ara" → çıkan IP'yi seç (genelde 9100 portu)
+    - veya elle: 192.168.1.50:9100
+    - Kaydet → Test fişi
+
+  Müşteri fişi
+    - USB (Windows) seç → "Yazıcıları bul" → yazıcının adını seç
+    - Kaydet → Test fişi
+
+Not: Yazıcı tanımlı değilken fiş kuyruğa girmez. "Soprano Yazici" penceresi
+kapalıysa fiş basılmaz (satış devam eder, işler kuyrukta bekler).
+
+
+5) TABLETLERDEN BAĞLANMA (isteğe bağlı)
+---------------------------------------
+1. Sunucu bilgisayarın yerel IP'sini öğren:  ipconfig  → IPv4 adresi
+2. Tablet tarayıcısında:  http://SUNUCU_IP:8095   (ör. http://192.168.1.106:8095)
+3. İlk seferde Windows güvenlik duvarı sorarsa "Özel ağlarda izin ver" seç.
+
+Güvenlik duvarı kapalıysa, yönetici olarak cmd'de:
+  netsh advfirewall firewall add rule name="Soprano POS" dir=in action=allow protocol=TCP localport=8095
+
+
+6) VERİ VE YEDEK
+----------------
+Tüm veri bu klasörün içindeki  var  klasöründe:
+  var\pgdata    → ürünler, adisyonlar, personel, ayarlar (veritabanı)
+  var\uploads   → ürün görselleri
+
+Yedek: sunucu kapalıyken  var  klasörünü kopyala (ör. harici disk).
+Geri yükleme: kopyayı aynı yere geri koy.
+
+Mevcut kasa verisini bu bilgisayardan diğerine taşımak için:
+  eski bilgisayardaki  var  klasörünü, yeni kurulumun içine kopyala
+  (Kur.bat'ı çalıştırdıktan SONRA, Soprano POS.bat'tan ÖNCE).
+
+
+7) GÜNCELLEME
+-------------
+Yeni sürüm geldiğinde:
+  1. Soprano Kapat.bat ile kapat
+  2. Yeni dosyaları üzerine kopyala — var klasörünü SAKIN silme
+  3. Kur.bat çalıştır (paketler/derleme yenilenir)
+  4. Soprano POS.bat ile aç
+
+
+8) SORUN GİDERME
+----------------
+- "Node.js / npm bulunamadi"  → Node.js kurulu değil; https://nodejs.org kur, Kur.bat'ı tekrar çalıştır.
+- "Soprano zaten calisiyor"   → Uygulama zaten açık; tarayıcı açılır. Kapatmak için Soprano Kapat.bat.
+- "8095 portu kullanımda"     → Başka bir kopya açık olabilir: taskmgr'de node.exe'leri kapat veya Soprano Kapat.bat.
+- Fiş çıkmıyor                → "Soprano Yazici" penceresi açık mı? Yönetim > Yazıcılar > son işlerde hata mesajına bak.
+- Tarayıcı açılmıyor          → Elle git: http://localhost:8095
+
+
+9) TEKNİK NOTLAR
+----------------
+- Sunucu: Node.js + Fastify, veritabanı: PGlite (gömülü, kurulum gerektirmez)
+- Arayüz: React (PWA) — tablet tarayıcısında tam ekran kullanılabilir
+- Port: 8095 (değiştirmek için: set PORT=9000 && npm start)
+- node_modules klasörü pakete DAHİL DEĞİL; Kur.bat indirir.
+  İnternet yoksa: bu bilgisayardaki node_modules klasörünü elle kopyalayabilirsin.
