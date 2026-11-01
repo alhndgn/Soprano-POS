@@ -15,6 +15,7 @@ export default function Admin() {
   const { boot, refresh } = useApp()
   const [tab, setTab] = useState<'menu' | 'staff' | 'layout' | 'printers' | 'settings'>('menu')
   const tableDetail = boot?.prefs?.tableDetail !== false
+  const vatOn = boot?.prefs?.vatIncluded !== false
   const [menu, setMenu] = useState<MenuRow[]>([])
   const [staff, setStaff] = useState<StaffRow[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -210,7 +211,7 @@ export default function Admin() {
                 <th style={{ width: 74 }}>Görsel</th>
                 <th>Ürün</th>
                 <th>Kategori</th>
-                <th>KDV</th>
+                {vatOn && <th>KDV</th>}
                 <th>Fiyatlar</th>
                 <th style={{ width: 108 }}>Durum</th>
                 <th style={{ width: 96 }}>İşlem</th>
@@ -254,7 +255,7 @@ export default function Admin() {
                     </div>
                   </td>
                   <td style={{ color: 'var(--muted)' }}>{p.category}</td>
-                  <td style={{ color: 'var(--muted)' }}>%{p.vat_rate}</td>
+                  {vatOn && <td style={{ color: 'var(--muted)' }}>%{p.vat_rate}</td>}
                   <td style={{ fontVariantNumeric: 'tabular-nums' }}>
                     {p.variants.map((v) => `${v.name} ${money(v.price)}`).join(' · ')}
                   </td>
