@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Soprano POS — kapak</title>
+<style>
+  :root {
+    --accent: #e8323f;
+    --accent-2: #ff6b3d;
+    --ink: #f3f5f8;
+    --muted: #9aa6b6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 640px; overflow: hidden; }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+    background:
+      radial-gradient(760px 420px at 8% -10%, rgba(232, 50, 63, .30), transparent 62%),
+      radial-gradient(680px 380px at 96% 108%, rgba(255, 107, 61, .18), transparent 60%),
+      linear-gradient(160deg, #0a0e14 0%, #0e141d 52%, #101823 100%);
+    color: var(--ink);
+    display: grid;
+    grid-template-columns: 470px 1fr;
+    gap: 40px;
+    padding: 54px 56px 48px;
+  }
+  .left { display: flex; flex-direction: column; justify-content: space-between; min-width: 0; }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .mark {
+    width: 52px; height: 52px; border-radius: 16px;
+    display: grid; place-items: center;
+    font-size: 26px; font-weight: 800; color: #fff;
+    background: linear-gradient(150deg, var(--accent), #b3121f);
+    box-shadow: 0 12px 30px rgba(232, 50, 63, .35);
+  }
+  .brand small { display: block; font-size: 11px; letter-spacing: .22em; color: var(--muted); font-weight: 700; }
+  .brand b { font-size: 17px; letter-spacing: .01em; }
+  h1 {
+    font-size: 62px; line-height: .98; letter-spacing: -.03em; font-weight: 800;
+    margin: 26px 0 16px;
+  }
+  h1 span { color: var(--accent); }
+  .lede { font-size: 18px; line-height: 1.5; color: #c6cfdb; max-width: 26ch; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 26px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 7px 12px; border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.13);
+    background: rgba(255,255,255,.05);
+    font-size: 12.5px; color: #dbe3ee; font-weight: 600;
+  }
+  .chip i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-2); }
+  .foot { font-size: 11.5px; letter-spacing: .06em; color: var(--muted); text-transform: uppercase; }
+  .right { position: relative; display: grid; place-items: center; }
+  .glow {
+    position: absolute; width: 460px; height: 460px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(232,50,63,.28), transparent 68%);
+    filter: blur(12px);
+  }
+  .frame {
+    position: relative; width: 100%; border-radius: 20px; overflow: hidden;
+    border: 1px solid rgba(255,255,255,.14);
+    background: #0b0f15;
+    box-shadow: 0 40px 90px rgba(0,0,0,.55), 0 0 0 1px rgba(0,0,0,.3);
+    transform: perspective(1400px) rotateY(-7deg) rotateX(2deg);
+  }
+  .bar {
+    height: 30px; display: flex; align-items: center; gap: 6px; padding: 0 12px;
+    background: #121924; border-bottom: 1px solid rgba(255,255,255,.07);
+  }
+  .bar i { width: 8px; height: 8px; border-radius: 50%; background: #3a4553; }
+  .bar i:first-child { background: #ff5f57; }
+  .bar i:nth-child(2) { background: #febc2e; }
+  .bar i:nth-child(3) { background: #28c840; }
+  .frame img { display: block; width: 100%; height: auto; }
+  .tag {
+    position: absolute; right: -14px; bottom: -18px;
+    padding: 12px 16px; border-radius: 14px;
+    background: rgba(13, 19, 27, .94);
+    border: 1px solid rgba(255,255,255,.14);
+    box-shadow: 0 18px 40px rgba(0,0,0,.5);
+    font-size: 12.5px; color: #e8eef6;
+  }
+  .tag b { display: block; font-size: 15px; margin-bottom: 2px; }
+  .tag span { color: var(--muted); }
+</style>
+</head>
+<body>
+  <div class="left">
+    <div>
+      <div class="brand">
+        <div class="mark">S</div>
+        <div>
+          <small>RESTORAN POS</small>
+          <b>Soprano</b>
+        </div>
+      </div>
+      <h1>Salonun tamamı<br><span>tek ekranda.</span></h1>
+      <p class="lede">Masa, adisyon, mutfak, gel al, yazıcı ve raporlar. Tek sunucuda, tablet tarayıcıda.</p>
+      <div class="chips">
+        <span class="chip"><i></i>Masa &amp; adisyon</span>
+        <span class="chip"><i></i>Mutfak ekranı</span>
+        <span class="chip"><i></i>Gel Al</span>
+        <span class="chip"><i></i>ESC/POS yazıcı</span>
+        <span class="chip"><i></i>Raporlar</span>
+      </div>
+    </div>
+    <div class="foot">MIT lisans · Node.js + React · PGlite · İnternetsiz çalışır</div>
+  </div>
+
+  <div class="right">
+    <div class="glow"></div>
+    <div class="frame">
+      <div class="bar"><i></i><i></i><i></i></div>
+      <img src="../screenshots/order.png" alt="Soprano POS sipariş ekranı">
+    </div>
+    <div class="tag"><b>700,00 ₺</b><span>Masa 1 · 4 kişi · mutfakta</span></div>
+  </div>
+</body>
+</html>
