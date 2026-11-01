@@ -62,6 +62,7 @@ type Prefs = {
   productDetail: boolean
   orderDetail: boolean
   tableDetail: boolean
+  tableSections: boolean
   paymentPreselect: boolean
   theme: 'light' | 'dark'
 }
@@ -71,6 +72,7 @@ const DEFAULT_PREFS: Prefs = {
   productDetail: true,
   orderDetail: true,
   tableDetail: true,
+  tableSections: true,
   paymentPreselect: false,
   theme: 'light',
 }
@@ -83,6 +85,7 @@ async function getPrefs(): Promise<Prefs> {
     productDetail: saved.productDetail !== false,
     orderDetail: saved.orderDetail !== false,
     tableDetail: saved.tableDetail !== false,
+    tableSections: saved.tableSections !== false,
     paymentPreselect: saved.paymentPreselect === true,
     theme: saved.theme === 'dark' ? 'dark' : 'light',
   }
@@ -1917,6 +1920,7 @@ export async function registerRoutes(app: FastifyInstance) {
           productDetail: z.boolean().optional(),
           orderDetail: z.boolean().optional(),
           tableDetail: z.boolean().optional(),
+          tableSections: z.boolean().optional(),
           paymentPreselect: z.boolean().optional(),
           theme: z.enum(['light', 'dark']).optional(),
         })

@@ -25,9 +25,14 @@ export default function Tables() {
   const [guests, setGuests] = useState(2)
   const [opening, setOpening] = useState(false)
 
+  const tableSections = boot?.prefs?.tableSections !== false
   const tableDetail = boot?.prefs?.tableDetail !== false
+  // Bölümler kapalıysa tüm masalar tek listede, plan/şekil yok.
+  const simpleMode = !tableDetail || !tableSections
   const floors = boot?.floors ?? []
   const active = floors.find((f) => f.id === floorId) ?? floors[0]
+  const allTables = useMemo(() => floors.flatMap((f) => f.tables), [floors])
+  const shownTables = tableSections ? active?.tables ?? [] : allTables
 
   const stats = useMemo(() => {
     const all = floors.flatMap((f) => f.tables)
@@ -91,9 +96,10 @@ export default function Tables() {
 
   /** Basit modda hızlı masa ekleme. */
   const addTable = async () => {
-    if (!active) return
+    const targetFloor = tableSections ? active : floors[0]
+    if (!targetFloor) return
     try {
-      await api.addTable({ floorId: active.id, name: `Masa ${active.tables.length + 1}`, seats: 4, shape: 'square' })
+      await api.addTable({ floorId: targetFloor.id, name: `Masa ${targetFloor.tables.length + 1}`, seats: 4, shape: 'square' })
       await refresh()
     } catch {
       /* yönetici değilse yoksay */
@@ -114,6 +120,7 @@ export default function Tables() {
         </div>
       </div>
 
+      {tableSections && (
       <div className="floors">
         {floors.map((f) => (
           <button key={f.id} className={`floor-tab${f.id === active?.id ? ' on' : ''}`} onClick={() => setFloorId(f.id)}>
@@ -129,10 +136,19 @@ export default function Tables() {
           </button>
         )}
       </div>
+      )}
 
-      <div className={`tables-layout${tableDetail ? '' : ' simple'}`}>
+      {!tableSections && me?.role === 'manager' && (
+        <div className="floors">
+          <button type="button" className="floor-tab add-table" onClick={() => void addTable()}>
+            + Masa ekle
+          </button>
+        </div>
+      )}
+
+      <div className={`tables-layout${simpleMode ? ' simple' : ''}`}>
         <div className="plan-wrap">
-          {tableDetail ? (
+          {tableDetail && tableSections ? (
             <div className="plan-canvas pos-plan" role="region" aria-label={`${active?.name ?? 'Salon'} masa planı`}>
               <div className="plan-grid" />
               {(active?.tables ?? []).map((t, i) => {
@@ -186,7 +202,7 @@ export default function Tables() {
             </div>
           ) : (
             <div className="table-grid">
-              {(active?.tables ?? []).map((t) => {
+              {shownTables.map((t) => {
                 const o = t.order
                 return (
                   <button
@@ -208,7 +224,7 @@ export default function Tables() {
                   </button>
                 )
               })}
-              {(active?.tables ?? []).length === 0 && (
+              {shownTables.length === 0 && (
                 <div className="plan-empty">
                   Masa yok.
                   <br />

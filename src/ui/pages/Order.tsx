@@ -34,6 +34,7 @@ export default function OrderPage() {
   const [busy, setBusy] = useState(false)
   const [descOpen, setDescOpen] = useState(false)
   const [lineDetail, setLineDetail] = useState<OrderLine | null>(null)
+  const [sentFx, setSentFx] = useState(false)
   const [lineNote, setLineNote] = useState('')
 
   const prefs = boot?.prefs
@@ -76,15 +77,35 @@ export default function OrderPage() {
       const o = await fn()
       setOrder(o)
       setError(null)
+      return true
     } catch (e: any) {
       setError(e.message)
+      return false
     } finally {
       setBusy(false)
     }
   }
 
+  const sendToKitchen = async () => {
+    if (!order?.lines.some((l) => l.status === 'new')) return
+    const ok = await doAction(() => api.send(orderId))
+    if (ok) {
+      setSentFx(true)
+      window.setTimeout(() => setSentFx(false), 1700)
+    }
+  }
+
   const pickProduct = (p: Product) => {
-    // Zorunlu seçim yoksa: detay ayarı kapalıyken doğrudan sepete ekle.
+    // Ürün detayları kapalıysa: boyut/seçenek sormadan doğrudan sepete ekle.
+    // (Varsayılan boyut = ürünün ilk boyutu.) Not, sepet satırından yazılır.
+    if (!productDetailOn) {
+      void doAction(() =>
+        api.addLine(orderId, { productId: p.id, variantId: p.variants[0]?.id ?? null, qty: 1, modifierIds: [] }),
+      )
+      return
+    }
+
+    // Detay açık ama "ürüne basınca detay açılsın" kapalıysa: zorunlu seçim yoksa direkt ekle.
     const needsChoice = p.variants.length > 1 || p.groups.some((g) => g.min > 0)
     if (!detailOn && !needsChoice) {
       void doAction(() =>
@@ -316,7 +337,7 @@ export default function OrderPage() {
               className="btn"
               disabled={busy || !order.lines.some((l) => l.status === 'new')}
               aria-label="Yeni ürünleri mutfağa gönder"
-              onClick={() => void doAction(() => api.send(orderId))}
+              onClick={() => void sendToKitchen()}
             >
               {order.lines.some((l) => l.status === 'new') ? 'Mutfağa Gönder' : 'Mutfağa gönderildi'}
             </button>
@@ -568,6 +589,16 @@ export default function OrderPage() {
         </div>
       )}
 
+      {sentFx && (
+        <div className="kitchen-fx" role="status" aria-live="polite">
+          <div className="kitchen-fx-card">
+            <div className="kitchen-fx-flight" aria-hidden="true">🧾</div>
+            <b>Mutfağa gönderildi</b>
+            <small>Fiş mutfak yazıcısına iletildi</small>
+          </div>
+        </div>
+      )}
+
       {successFx && (
         <div className="payment-success-overlay" role="status" aria-live="polite">
           <div className="payment-success-mark">✓</div>
@@ -592,6 +623,8 @@ function CartLine({
   onQty: (qty: number) => void
   onVoid: () => void
 }) {
+  const { boot } = useApp()
+  const detailOff = boot?.prefs?.productDetail === false
   const voided = line.status === 'void'
   const unitTotal = lineTotal({ ...line, qty: 1 })
   return (
@@ -599,7 +632,7 @@ function CartLine({
       <div className="line-top">
         <div>
           <button type="button" className="line-name line-open" onClick={onOpen}>
-            {line.name}
+            {detailOff ? line.name.replace(/\s*\([^)]*\)$/, '') : line.name}
           </button>
           {line.modifiers.length > 0 && (
             <div className="line-mods">{line.modifiers.map((m) => (m.price > 0 ? `${m.name} +${money(m.price)}` : m.name)).join(' · ')}</div>

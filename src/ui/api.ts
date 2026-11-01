@@ -71,6 +71,7 @@ export type Prefs = {
   productDetail: boolean
   orderDetail: boolean
   tableDetail: boolean
+  tableSections: boolean
   paymentPreselect: boolean
   theme: 'light' | 'dark'
 }

@@ -15,7 +15,15 @@ Pizzacı için masa/adisyon, mutfak ekranı ve kasa yönetimi. Tek sunucu, table
 - **Menü görselleri:** ürün fotoğrafı yükle, sipariş kartlarında görünsün
 - **Açık tema:** sıcak beyaz yüzeyler + tomato red vurgu, tablette yüksek kontrast
 - **Premium UI/UX:** operasyonel sidebar, KPI başlıkları, canlı servis paneli, KDS tek sipariş kartı, responsive POS
-- **Adisyon iptali:** yanlış açılan adisyonu yönetici iptal eder
+- **Adisyon iptali:** yanlış açılan adisyonu yönetici iptal eder (gerekçe + personel kaydı, raporda ayrı panel)
+- **Gel Al (paket):** ayrı ekran, müşteri adı/telefon, masadan bağımsız adisyon
+- **Satır bazlı ödeme:** ürün seçerek kısmi ödeme, iskonto (%/₺), nakit/kart, canlı para üstü
+- **Yazıcılar:** mutfak KOT + kasa fişi + iptal fişi; ağ (9100), USB (Windows spooler) veya dosya; test fişi ve iş kuyruğu
+- **Ayarlar:** KDV gösterimi, ürün detayları, sipariş detayı, masa bölümleri, masa düzeni, ödeme ön seçimi, tema
+- **Raporlar:** tarih aralığı, günlük ortalama, kategori bazlı satış, en çok satanlar, ödenen/iptal adisyonlar
+- **Kategori görselleri:** yönetimden kategori resmi yükle, sipariş ekranında görünsün
+- **İlk açılışta kişi sayısı:** boş masaya dokununca kaç kişi sorulur
+- **Tablet uyumlu:** 800–1280 px arası dikey/yatay tabletlerde tek kolon sipariş + altta sepet
 
 ## Hızlı başlangıç
 
@@ -57,7 +65,8 @@ RECEIPT_PRINTER=192.168.1.50:9100 KITCHEN_PRINTER=192.168.1.51:9100 npm run brid
 | Adisyon | `/order/:id` | Ürün/modifier seçimi, mutfağa gönderim, ödeme |
 | Mutfak | `/kds` | Üç kolonlu hazırlık akışı |
 | Rapor | `/reports` | Günlük ciro, ödeme dağılımı, top ürünler |
-| Yönetim | `/admin` | Masa düzeni, menü + görseller, personel |
+| Gel Al | `/takeaway` | Paket siparişler, yeni gel al |
+| Yönetim | `/admin` | Menü + görseller, personel, masa düzeni, yazıcılar, ayarlar |
 | Vardiya | `/shift` | Kasa aç/kapa |
 
 ## Mimari
@@ -76,7 +85,7 @@ src/ui       React PWA (POS, KDS, rapor, yönetim)
 ## Test
 
 ```bash
-npm test            # 11 birim testi (para, KDV, yuvarlama, para üstü)
+npm test            # 36 birim testi (para, KDV, iskonto, ödeme dağıtımı, fiş KDV'si)
 npm run typecheck   # tsc --noEmit
 python scripts/e2e_layout.py     # 16 doğrulama: bölme/masa CRUD, yerleşim, silme korumaları
 python scripts/e2e_products.py   # 20 doğrulama: ürün CRUD, içerik fiyatı, KOT içeriği
@@ -97,7 +106,23 @@ Uçtan uca API senaryosu (27 doğrulama) `scripts/e2e.py` içinde — **temiz ve
 | `DRY_RUN` | yazıcı yoksa 1 | Fişi dosyaya yazar |
 | `SOPRANO_PRINTER_CP857` | 0 | 1 ise Türkçe karakterler ham gönderilir |
 
+## Güncelleme (şubeler)
+
+Kurulum git ile alınmışsa (`git clone`), yeni sürüm için:
+
+1. Sunucu penceresini kapat (veya **Soprano Kapat.bat**)
+2. **GUNCELLE.bat** çift tıkla → `git fetch` + `npm install` + build + uygulamayı başlatır
+3. Veriler `var/` klasöründe kalır, güncellemeden etkilenmez
+
+Geliştirme makinesinde yayınlama:
+
+```bash
+git add -A
+git commit -m "Aciklama"
+git push
+```
+
 ## Yol haritası
 
-v0.2: paket servis + kurye · QR menü · ÖKC/e-Arşiv · Mikro aktarımı · stok-reçete · masa birleştirme.
+v0.2: kurye takibi · QR menü · ÖKC/e-Arşiv · Mikro aktarımı · stok-reçete · masa birleştirme.
 Ayrıntı: `docs/superpowers/specs/2026-10-27-soprano-pos-design.md`

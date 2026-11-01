@@ -30,6 +30,11 @@ const ROWS: Row[] = [
     desc: 'Kapalıysa masalar sade ızgara olarak listelenir, plan/şekil düzenlemesi gizlenir.',
   },
   {
+    key: 'tableSections',
+    title: 'Masaları bölümlendir',
+    desc: 'Açıksa İç Mekan / Dış Mekan gibi bölümler kullanılır. Kapalıysa tüm masalar tek listede görünür.',
+  },
+  {
     key: 'paymentPreselect',
     title: 'Ödemede ürünler işaretli gelsin',
     desc: 'Açıksa ödeme ekranında tüm satırlar seçili başlar.',

@@ -61,7 +61,7 @@ export default function Login({ onDone }: { onDone: () => void }) {
         <div className="brand-mark" aria-hidden="true">S</div>
         <p className="login-kicker">SOPRANO / RESTAURANT OPERATIONS</p>
         <h1>Operasyona giriş</h1>
-        <p>Personel PIN kodunuzu girin. Kasa, masalar ve mutfak tek yerde.</p>
+        <p>Personel PIN kodunuzu girin.</p>
 
         <div className={`pin-display${shake ? ' shake' : ''}`} aria-label={`${pin.length} hane girildi}`}>
           {Array.from({ length: 4 }).map((_, i) => (
