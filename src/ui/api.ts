@@ -23,7 +23,7 @@ export type Product = {
   variants: Variant[]
   groups: ModGroup[]
 }
-export type Category = { id: number; name: string; emoji: string; products: Product[] }
+export type Category = { id: number; name: string; emoji: string; imageUrl?: string | null; products: Product[] }
 export type OpenOrder = {
   id: number
   table_id: number | null
@@ -66,9 +66,18 @@ export type Floor = { id: number; name: string; tables: Table[] }
 export type Shift = { id: number; opened_at: string; opening_float: number } | null
 
 export type AppVersion = { version: string; commit: string }
+export type Prefs = {
+  vatIncluded: boolean
+  productDetail: boolean
+  orderDetail: boolean
+  tableDetail: boolean
+  paymentPreselect: boolean
+  theme: 'light' | 'dark'
+}
 export type Bootstrap = {
   me: Me
   version?: AppVersion
+  prefs?: Prefs
   outlet: { name?: string; footer?: string; address?: string; phone?: string }
   shift: Shift
   floors: Floor[]
@@ -373,6 +382,63 @@ export const api = {
     return data as { ok: boolean; imageUrl: string }
   },
   deleteImage: (productId: number) => request('DELETE', `/api/admin/products/${productId}/image`),
+
+  // ayarlar
+  settings: () => request<{ prefs: Prefs }>('GET', '/api/admin/settings'),
+  saveSettings: (patch: Partial<Prefs>) => request<{ prefs: Prefs }>('PUT', '/api/admin/settings', patch),
+  uploadCategoryImage: async (categoryId: number, file: File) => {
+    const token = auth.get()
+    const body = new FormData()
+    body.append('file', file)
+    const res = await fetch(`/api/admin/categories/${categoryId}/image`, {
+      method: 'POST',
+      headers: token ? { authorization: `Bearer ${token}` } : undefined,
+      body,
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new ApiError(data.error ?? 'Görsel yüklenemedi', res.status)
+    return data as { ok: boolean; imageUrl: string }
+  },
+  deleteCategoryImage: (categoryId: number) => request<{ ok: boolean }>('DELETE', `/api/admin/categories/${categoryId}/image`),
+
+  // rapor: tarih aralığı
+  reportRange: (from: string, to: string) =>
+    request<{
+      from: string
+      to: string
+      days: number
+      revenue: number
+      orders: number
+      discountTotal: number
+      avgPerDay: number
+      avgTicket: number
+      byMethod: { method: string; amount: number; count: number }[]
+      byType: { order_type: 'dine_in' | 'takeaway'; orders: number; revenue: number }[]
+      byCategory: { id: number; name: string; qty: number; revenue: number }[]
+      topProducts: { name: string; qty: number; revenue: number }[]
+      paidOrders: {
+        order_id: number
+        order_type: 'dine_in' | 'takeaway'
+        table_name: string | null
+        customer_name: string | null
+        discount_amount: number
+        total: number
+        payment_methods: string
+        closed_at: string
+      }[]
+      voidedOrders: {
+        order_id: number
+        order_type: 'dine_in' | 'takeaway'
+        table_name: string | null
+        customer_name: string | null
+        discount_amount: number
+        gross_total: number
+        total: number
+        reason: string
+        voided_by: string | null
+        voided_at: string | null
+      }[]
+    }>('GET', `/api/reports/range?from=${from}&to=${to}`),
 
   // yazıcılar
   printers: () =>

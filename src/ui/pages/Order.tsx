@@ -33,6 +33,13 @@ export default function OrderPage() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [descOpen, setDescOpen] = useState(false)
+  const [lineDetail, setLineDetail] = useState<OrderLine | null>(null)
+  const [lineNote, setLineNote] = useState('')
+
+  const prefs = boot?.prefs
+  const detailOn = prefs?.orderDetail !== false
+  const productDetailOn = prefs?.productDetail !== false
+  const vatOn = prefs?.vatIncluded !== false
 
   const load = useCallback(async () => {
     try {
@@ -77,13 +84,15 @@ export default function OrderPage() {
   }
 
   const pickProduct = (p: Product) => {
-    const needVariant = p.variants.length > 1
-    if (!needVariant && p.groups.length === 0) {
+    // Zorunlu seçim yoksa: detay ayarı kapalıyken doğrudan sepete ekle.
+    const needsChoice = p.variants.length > 1 || p.groups.some((g) => g.min > 0)
+    if (!detailOn && !needsChoice) {
       void doAction(() =>
         api.addLine(orderId, { productId: p.id, variantId: p.variants[0]?.id ?? null, qty: 1, modifierIds: [] }),
       )
       return
     }
+
     setDescOpen(false)
     setSheet({
       product: p,
@@ -146,28 +155,27 @@ export default function OrderPage() {
   }
 
   return (
-    <div className="order-layout">
-      <nav className="cat-rail" aria-label="Ürün kategorileri">
-        <span className="cat-rail-title">Menü</span>
-        {menu.map((c) => (
-          <button key={c.id} className={`cat-btn${c.id === activeCat?.id ? ' on' : ''}`} onClick={() => setCatId(c.id)}>
-            <span>{c.emoji}</span>
-            {c.name}
-          </button>
-        ))}
-      </nav>
-
+    <div className="order-layout order-layout-v2">
       <div className="product-panel">
-        <div className="product-head">
-          <div>
-            <p className="eyebrow">SİPARİŞ OLUŞTUR</p>
-            <h2>{activeCat?.name}</h2>
-            <div className="sub" style={{ color: 'var(--muted)', fontSize: 12.5, marginTop: 4 }}>
-              {orderTitle}
-              {order.order_type === 'takeaway' ? ' · paket' : ` · ${order.guest_count} kişi`} · {elapsed(order.opened_at)}
-            </div>
-          </div>
-          <button className="btn ghost sm" onClick={() => navigate('/tables')}>
+        <div className="cat-bar" role="tablist" aria-label="Ürün kategorileri">
+          {menu.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              role="tab"
+              aria-selected={c.id === activeCat?.id}
+              className={`cat-tile${c.id === activeCat?.id ? ' on' : ''}`}
+              onClick={() => setCatId(c.id)}
+            >
+              {c.imageUrl ? (
+                <img className="cat-tile-img" src={c.imageUrl} alt="" loading="lazy" />
+              ) : (
+                <span className="cat-tile-emoji" aria-hidden="true">{c.emoji}</span>
+              )}
+              <span className="cat-tile-name">{c.name}</span>
+            </button>
+          ))}
+          <button type="button" className="btn ghost sm cat-back" onClick={() => navigate('/tables')}>
             ← Masalar
           </button>
         </div>
@@ -191,17 +199,19 @@ export default function OrderPage() {
                   )}
                   <div className="product-body">
                     <div className="product-name">{p.name}</div>
-                    <div className="product-hint">
-                      {p.variants.length > 1 ? `${p.variants.length} boy` : p.variants[0]?.name}
-                      {p.groups.length ? ` · ${p.groups.length} seçenek` : ''}
-                    </div>
+                    {productDetailOn && (
+                      <div className="product-hint">
+                        {p.variants.length > 1 ? `${p.variants.length} boy` : p.variants[0]?.name}
+                        {p.groups.length ? ` · ${p.groups.length} seçenek` : ''}
+                      </div>
+                    )}
                     <div className="product-price">
                       <span>{money(min)}</span>
                       <span className="product-add">+ Ekle</span>
                     </div>
                   </div>
                 </button>
-                {p.description && (
+                {productDetailOn && p.description && (
                   <button
                     type="button"
                     className="product-info-button"
@@ -259,7 +269,7 @@ export default function OrderPage() {
           {order.lines.length === 0 && (
             <div className="empty-cart">
               <span>🍕</span>
-              Ürün seçmek için soldaki menüye dokun
+              Ürün seçmek için menüden bir ürüne dokun
             </div>
           )}
           {order.lines.map((l) => (
@@ -267,6 +277,10 @@ export default function OrderPage() {
               key={l.id}
               line={l}
               canVoid={canVoid}
+              onOpen={() => {
+                setLineDetail(l)
+                setLineNote(l.note ?? '')
+              }}
               onQty={(qty) => void doAction(() => api.patchLine(l.id, { qty }))}
               onVoid={() => {
                 if (!confirm(`${l.name} iptal edilsin mi?`)) return
@@ -278,16 +292,20 @@ export default function OrderPage() {
 
         <div className="cart-foot">
           {error && <div style={{ color: 'var(--danger)', fontSize: 12.5, marginBottom: 8 }}>{error}</div>}
-          <div className="totals-row">
-            <span>Ara toplam (KDV hariç)</span>
-            <b>{money(totals?.subtotal ?? 0)}</b>
-          </div>
-          {(totals?.vatLines ?? []).map((v) => (
-            <div className="totals-row" key={v.rate}>
-              <span>KDV %{v.rate}</span>
-              <b>{money(v.vat)}</b>
-            </div>
-          ))}
+          {vatOn && (
+            <>
+              <div className="totals-row">
+                <span>Ara toplam (KDV hariç)</span>
+                <b>{money(totals?.subtotal ?? 0)}</b>
+              </div>
+              {(totals?.vatLines ?? []).map((v) => (
+                <div className="totals-row" key={v.rate}>
+                  <span>KDV %{v.rate}</span>
+                  <b>{money(v.vat)}</b>
+                </div>
+              ))}
+            </>
+          )}
           <div className="totals-total">
             <span>Toplam</span>
             <b>{money(totals?.total ?? 0)}</b>
@@ -363,7 +381,7 @@ export default function OrderPage() {
               </div>
             )}
 
-            {sheet.product.groups.map((g) => (
+            {productDetailOn && sheet.product.groups.map((g) => (
               <div className="mod-group" key={g.id}>
                 <div className="mod-group-head">
                   <span>{g.name}</span>
@@ -389,7 +407,7 @@ export default function OrderPage() {
               </div>
             ))}
 
-            {sheet.product.ingredients.length > 0 && (
+            {productDetailOn && sheet.product.ingredients.length > 0 && (
               <div className="mod-group">
                 <div className="mod-group-head">
                   <span>İçindekiler</span>
@@ -461,6 +479,7 @@ export default function OrderPage() {
       {payOpen && order && (
         <PaymentModal
           order={order}
+          preselect={prefs?.paymentPreselect === true}
           onClose={() => setPayOpen(false)}
           onSubmit={(payload) => api.pay(orderId, payload)}
           onDone={async (result) => {
@@ -493,6 +512,62 @@ export default function OrderPage() {
         />
       )}
 
+      {lineDetail && (
+        <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && setLineDetail(null)}>
+          <div className="modal line-detail" role="dialog" aria-modal="true" aria-label={`${lineDetail.name} detayı`}>
+            <h3>{lineDetail.name}</h3>
+            <div className="sub">
+              {lineDetail.qty} × {money(lineTotal({ ...lineDetail, qty: 1 }))} = <b>{money(lineTotal(lineDetail))}</b>
+            </div>
+
+            {productDetailOn && lineDetail.modifiers.length > 0 && (
+              <div className="line-detail-block">
+                <span>Seçenekler</span>
+                <div className="line-mods">
+                  {lineDetail.modifiers.map((m) => (m.price > 0 ? `${m.name} +${money(m.price)}` : m.name)).join(' · ')}
+                </div>
+              </div>
+            )}
+
+            {productDetailOn && lineDetail.ingredients?.length > 0 && (
+              <div className="line-detail-block">
+                <span>İçindekiler</span>
+                <div className="line-ings">
+                  {lineDetail.ingredients.map((ing, idx) => (
+                    <span key={idx} className={`ing-tag ${ing.mode}`}>
+                      {ing.mode === 'removed' ? `${ing.name} yok` : `+ ${ing.name}${ing.price > 0 ? ` ${money(ing.price)}` : ''}`}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <label className="field" style={{ marginTop: 12 }}>
+              <span>Not</span>
+              <textarea
+                className="textarea"
+                placeholder="Örn. iyi pişsin, soğan olmasın…"
+                value={lineNote}
+                onChange={(e) => setLineNote(e.target.value)}
+              />
+            </label>
+
+            <div className="modal-actions">
+              <button className="btn" onClick={() => setLineDetail(null)}>Vazgeç</button>
+              <button
+                className="btn primary"
+                onClick={async () => {
+                  await doAction(() => api.patchLine(lineDetail.id, { note: lineNote.trim() || null }))
+                  setLineDetail(null)
+                }}
+              >
+                Kaydet
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {successFx && (
         <div className="payment-success-overlay" role="status" aria-live="polite">
           <div className="payment-success-mark">✓</div>
@@ -507,11 +582,13 @@ export default function OrderPage() {
 function CartLine({
   line,
   canVoid,
+  onOpen,
   onQty,
   onVoid,
 }: {
   line: OrderLine
   canVoid: boolean
+  onOpen: () => void
   onQty: (qty: number) => void
   onVoid: () => void
 }) {
@@ -521,7 +598,9 @@ function CartLine({
     <div className={`cart-line${voided ? ' voided' : ''}`}>
       <div className="line-top">
         <div>
-          <div className="line-name">{line.name}</div>
+          <button type="button" className="line-name line-open" onClick={onOpen}>
+            {line.name}
+          </button>
           {line.modifiers.length > 0 && (
             <div className="line-mods">{line.modifiers.map((m) => (m.price > 0 ? `${m.name} +${money(m.price)}` : m.name)).join(' · ')}</div>
           )}

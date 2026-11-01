@@ -70,6 +70,8 @@ export type ReceiptPayload = {
   }[]
   subtotal: number
   vatLines: { rate: number; vat: number; gross: number }[]
+  /** false ise fişte KDV dökümü basılmaz (ayarlardan kapatılabilir) */
+  showVat?: boolean
   total: number
   payments: { method: string; amount: number }[]
   change: number
@@ -120,7 +122,9 @@ export function buildReceipt(p: ReceiptPayload, paperWidth = 80): Buffer {
     if (l.added?.length) e.text(`   + ${l.added.join(', ')}`)
   }
   e.line()
-  for (const v of p.vatLines) e.row(`KDV %${v.rate} dahil`, tl(v.gross))
+  if (p.showVat !== false) {
+    for (const v of p.vatLines) e.row(`KDV %${v.rate} dahil`, tl(v.gross))
+  }
   e.bold(true).row('TOPLAM', tl(p.total)).bold(false)
   e.line()
   for (const pay of p.payments) {

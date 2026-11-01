@@ -55,6 +55,12 @@ app.setErrorHandler((err: any, req, reply) => {
   return reply.code(status).send({ error: err.message ?? 'Sunucu hatası' })
 })
 
+// API yanıtları önbelleğe alınmasın (kasa verisi bayat görünmesin)
+app.addHook('onSend', async (req, reply, payload) => {
+  if (req.url.startsWith('/api/')) reply.header('cache-control', 'no-store')
+  return payload
+})
+
 await registerRoutes(app)
 
 const dist = path.join(process.cwd(), 'dist')

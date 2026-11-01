@@ -50,6 +50,54 @@ async function appVersion(): Promise<{ version: string; commit: string }> {
   return versionCache
 }
 
+const IMAGE_TYPES: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+}
+
+/** Arayüz tercihleri (settings tablosunda 'prefs' anahtarı). */
+type Prefs = {
+  vatIncluded: boolean
+  productDetail: boolean
+  orderDetail: boolean
+  tableDetail: boolean
+  paymentPreselect: boolean
+  theme: 'light' | 'dark'
+}
+
+const DEFAULT_PREFS: Prefs = {
+  vatIncluded: true,
+  productDetail: true,
+  orderDetail: true,
+  tableDetail: true,
+  paymentPreselect: false,
+  theme: 'light',
+}
+
+async function getPrefs(): Promise<Prefs> {
+  const row = await db.one<any>(`SELECT value FROM settings WHERE key='prefs'`)
+  const saved = row?.value ?? {}
+  return {
+    vatIncluded: saved.vatIncluded !== false,
+    productDetail: saved.productDetail !== false,
+    orderDetail: saved.orderDetail !== false,
+    tableDetail: saved.tableDetail !== false,
+    paymentPreselect: saved.paymentPreselect === true,
+    theme: saved.theme === 'dark' ? 'dark' : 'light',
+  }
+}
+
+async function savePrefs(patch: Partial<Prefs>): Promise<Prefs> {
+  const next = { ...(await getPrefs()), ...patch }
+  await db.run(
+    `INSERT INTO settings (key, value) VALUES ('prefs', $1::jsonb)
+     ON CONFLICT (key) DO UPDATE SET value=$1::jsonb`,
+    [JSON.stringify(next)],
+  )
+  return next
+}
+
 /** Tüm yazıcı tanımları (rol sırasıyla). */
 const listPrinters = () => db.all<PrinterConfig>(`SELECT * FROM printers ORDER BY device, id`)
 
@@ -265,7 +313,7 @@ export async function registerRoutes(app: FastifyInstance) {
          WHERE o.status = 'open'
          GROUP BY o.id`,
       )
-      const categories = await db.all<any>(`SELECT id, name, emoji FROM categories ORDER BY sort, id`)
+      const categories = await db.all<any>(`SELECT id, name, emoji, image_url FROM categories ORDER BY sort, id`)
       const products = await db.all<any>(
         `SELECT id, category_id, name, vat_rate, image_url, description
          FROM products WHERE active = true AND deleted_at IS NULL ORDER BY sort, id`,
@@ -285,6 +333,7 @@ export async function registerRoutes(app: FastifyInstance) {
       return {
         me,
         version: await appVersion(),
+        prefs: await getPrefs(),
         outlet: outlet?.value ?? {},
         shift,
         // Masaya bağlı olmayan gel al adisyonları
@@ -299,6 +348,7 @@ export async function registerRoutes(app: FastifyInstance) {
           id: c.id,
           name: c.name,
           emoji: c.emoji,
+          imageUrl: c.image_url,
           products: products
             .filter((p) => p.category_id === c.id)
             .map((p) => ({
@@ -842,6 +892,7 @@ export async function registerRoutes(app: FastifyInstance) {
                       (line.ingredients ?? []).filter((i) => i.mode === 'added').reduce((s, i) => s + i.price, 0)) *
                     line.qty,
                 })),
+                showVat: (await getPrefs()).vatIncluded,
                 subtotal: finalTotals.subtotal,
                 vatLines: finalTotals.vatLines,
                 total: finalTotals.total,
@@ -982,6 +1033,138 @@ export async function registerRoutes(app: FastifyInstance) {
         byType,
         topProducts,
         hourly,
+      }
+    })
+
+    /** Tarih aralığı raporu: ciro, günlük ortalama, kategori bazlı satış. */
+    scope.get('/api/reports/range', async (req) => {
+      requireRole(user(req), ['manager'])
+      const { from, to } = z
+        .object({
+          from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+          to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        })
+        .parse(req.query)
+      if (from > to) throw httpError(400, 'Başlangıç tarihi bitişten sonra olamaz')
+
+      const span = await db.one<{ d: number }>(`SELECT (($2::date - $1::date) + 1)::int AS d`, [from, to])
+      const days = Math.max(1, Number(span?.d ?? 1))
+
+      const totals = await db.one<any>(
+        `SELECT count(*)::int AS c,
+                COALESCE(SUM(GREATEST(gross_total - discount_amount, 0)), 0)::int AS revenue,
+                COALESCE(SUM(discount_amount), 0)::int AS discount_total
+         FROM (
+           SELECT o.id, o.discount_amount,
+             COALESCE((SELECT SUM((ol.unit_price
+               + COALESCE((SELECT SUM(lm.price) FROM line_modifiers lm WHERE lm.line_id=ol.id),0)
+               + COALESCE((SELECT SUM(li.price) FROM line_ingredients li WHERE li.line_id=ol.id AND li.mode='added'),0)
+             ) * ol.qty) FROM order_lines ol WHERE ol.order_id=o.id AND ol.status<>'void'),0)::int AS gross_total
+           FROM orders o
+           WHERE o.status='paid' AND o.closed_at::date BETWEEN $1::date AND $2::date
+         ) x`,
+        [from, to],
+      )
+
+      const byMethod = await db.all<any>(
+        `SELECT p.method, SUM(p.amount)::int AS amount, count(*)::int AS count
+         FROM payments p
+         WHERE p.created_at::date BETWEEN $1::date AND $2::date
+         GROUP BY p.method ORDER BY amount DESC`,
+        [from, to],
+      )
+
+      const byType = await db.all<any>(
+        `SELECT o.order_type, count(*)::int AS orders,
+                COALESCE(SUM(GREATEST(x.gross_total - o.discount_amount, 0)), 0)::int AS revenue
+         FROM orders o
+         JOIN (
+           SELECT oo.id,
+             COALESCE((SELECT SUM((ol.unit_price
+               + COALESCE((SELECT SUM(lm.price) FROM line_modifiers lm WHERE lm.line_id=ol.id),0)
+               + COALESCE((SELECT SUM(li.price) FROM line_ingredients li WHERE li.line_id=ol.id AND li.mode='added'),0)
+             ) * ol.qty) FROM order_lines ol WHERE ol.order_id=oo.id AND ol.status<>'void'),0)::int AS gross_total
+           FROM orders oo WHERE oo.status='paid' AND oo.closed_at::date BETWEEN $1::date AND $2::date
+         ) x ON x.id = o.id
+         GROUP BY o.order_type`,
+        [from, to],
+      )
+
+      const byCategory = await db.all<any>(
+        `SELECT c.id, c.name,
+                SUM(ol.qty)::int AS qty,
+                SUM((ol.unit_price
+                  + COALESCE((SELECT SUM(lm.price) FROM line_modifiers lm WHERE lm.line_id=ol.id),0)
+                  + COALESCE((SELECT SUM(li.price) FROM line_ingredients li WHERE li.line_id=ol.id AND li.mode='added'),0)
+                ) * ol.qty)::int AS revenue
+         FROM order_lines ol
+         JOIN orders o ON o.id = ol.order_id
+         JOIN products pr ON pr.id = ol.product_id
+         JOIN categories c ON c.id = pr.category_id
+         WHERE o.status='paid' AND o.closed_at::date BETWEEN $1::date AND $2::date AND ol.status<>'void'
+         GROUP BY c.id, c.name ORDER BY revenue DESC`,
+        [from, to],
+      )
+
+      const topProducts = await db.all<any>(
+        `SELECT ol.name, SUM(ol.qty)::int AS qty,
+                SUM((ol.unit_price
+                  + COALESCE((SELECT SUM(lm.price) FROM line_modifiers lm WHERE lm.line_id=ol.id),0)
+                  + COALESCE((SELECT SUM(li.price) FROM line_ingredients li WHERE li.line_id=ol.id AND li.mode='added'),0)
+                ) * ol.qty)::int AS revenue
+         FROM order_lines ol JOIN orders o ON o.id=ol.order_id
+         WHERE o.status='paid' AND o.closed_at::date BETWEEN $1::date AND $2::date AND ol.status<>'void'
+         GROUP BY ol.name ORDER BY qty DESC LIMIT 10`,
+        [from, to],
+      )
+
+      const paidOrders = await db.all<any>(
+        `SELECT o.id AS order_id, o.order_type, t.name AS table_name, o.customer_name, o.discount_amount,
+                GREATEST(o.gross_total - o.discount_amount, 0)::int AS total,
+                COALESCE((SELECT string_agg(DISTINCT p.method, ', ' ORDER BY p.method)
+                          FROM payments p WHERE p.order_id=o.id), '') AS payment_methods,
+                o.closed_at
+         FROM (
+           SELECT oo.*, COALESCE((SELECT SUM((ol.unit_price
+               + COALESCE((SELECT SUM(lm.price) FROM line_modifiers lm WHERE lm.line_id=ol.id),0)
+               + COALESCE((SELECT SUM(li.price) FROM line_ingredients li WHERE li.line_id=ol.id AND li.mode='added'),0)
+             ) * ol.qty) FROM order_lines ol WHERE ol.order_id=oo.id AND ol.status<>'void'),0)::int AS gross_total
+           FROM orders oo WHERE oo.status='paid' AND oo.closed_at::date BETWEEN $1::date AND $2::date
+         ) o
+         LEFT JOIN tables t ON t.id = o.table_id
+         ORDER BY o.closed_at DESC LIMIT 200`,
+        [from, to],
+      )
+
+      const voidedOrders = await db.all<any>(
+        `SELECT o.id AS order_id, o.order_type, t.name AS table_name, o.customer_name, o.discount_amount,
+                COALESCE((SELECT SUM((ol.unit_price) * ol.qty) FROM order_lines ol WHERE ol.order_id=o.id AND ol.status<>'void'),0)::int AS gross_total,
+                GREATEST(COALESCE((SELECT SUM((ol.unit_price) * ol.qty) FROM order_lines ol WHERE ol.order_id=o.id AND ol.status<>'void'),0) - o.discount_amount, 0)::int AS total,
+                COALESCE(o.void_reason, '—') AS reason,
+                (SELECT u.name FROM users u WHERE u.id = o.voided_by) AS voided_by,
+                o.voided_at
+         FROM orders o
+         LEFT JOIN tables t ON t.id = o.table_id
+         WHERE o.status='void' AND o.closed_at::date BETWEEN $1::date AND $2::date
+         ORDER BY o.closed_at DESC LIMIT 200`,
+        [from, to],
+      )
+
+      return {
+        from,
+        to,
+        days,
+        revenue: totals?.revenue ?? 0,
+        orders: totals?.c ?? 0,
+        discountTotal: totals?.discount_total ?? 0,
+        avgPerDay: Math.round((totals?.revenue ?? 0) / days),
+        avgTicket: totals?.c ? Math.round((totals?.revenue ?? 0) / totals.c) : 0,
+        byMethod,
+        byType,
+        byCategory,
+        topProducts,
+        paidOrders,
+        voidedOrders,
       }
     })
 
@@ -1503,11 +1686,6 @@ export async function registerRoutes(app: FastifyInstance) {
     })
 
     // ---------- ürün görseli ----------
-    const IMAGE_TYPES: Record<string, string> = {
-      'image/jpeg': 'jpg',
-      'image/png': 'png',
-      'image/webp': 'webp',
-    }
 
     scope.post('/api/admin/products/:id/image', async (req) => {
       requireRole(user(req), ['manager'])
@@ -1719,6 +1897,70 @@ export async function registerRoutes(app: FastifyInstance) {
         const reason = String(err?.message ?? err).slice(0, 220)
         return { mode, available: false, printers: [], reason }
       }
+    })
+  })
+
+  // ---------- ayarlar (arayüz tercihleri) ----------
+  await app.register(async (scope) => {
+    scope.addHook('preHandler', authHook)
+
+    scope.get('/api/admin/settings', async (req) => {
+      requireRole(user(req), ['manager', 'cashier'])
+      return { prefs: await getPrefs() }
+    })
+
+    scope.put('/api/admin/settings', async (req) => {
+      requireRole(user(req), ['manager'])
+      const patch = z
+        .object({
+          vatIncluded: z.boolean().optional(),
+          productDetail: z.boolean().optional(),
+          orderDetail: z.boolean().optional(),
+          tableDetail: z.boolean().optional(),
+          paymentPreselect: z.boolean().optional(),
+          theme: z.enum(['light', 'dark']).optional(),
+        })
+        .parse(req.body ?? {})
+      const prefs = await savePrefs(patch)
+      broadcast('settings')
+      return { prefs }
+    })
+
+    // ---------- kategori görseli ----------
+    scope.post('/api/admin/categories/:id/image', async (req) => {
+      requireRole(user(req), ['manager'])
+      const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
+      const category = await db.one<any>(`SELECT id, image_url FROM categories WHERE id=$1`, [id])
+      if (!category) throw httpError(404, 'Kategori bulunamadı')
+      const file = await (req as any).file()
+      if (!file) throw httpError(400, 'Dosya gelmedi')
+      const ext = IMAGE_TYPES[file.mimetype]
+      if (!ext) throw httpError(400, 'Sadece JPEG, PNG veya WEBP yüklenebilir')
+      const dir = path.join(process.cwd(), 'var', 'uploads', 'categories')
+      await mkdir(dir, { recursive: true })
+      const filename = `c${id}-${Date.now()}.${ext}`
+      await pipeline(file.file, createWriteStream(path.join(dir, filename)))
+      const url = `/uploads/categories/${filename}`
+      await db.one(`UPDATE categories SET image_url=$1 WHERE id=$2 RETURNING id`, [url, id])
+      if (category.image_url?.startsWith('/uploads/')) {
+        const old = path.join(process.cwd(), 'var', category.image_url.replace(/^\/uploads\//, 'uploads/'))
+        unlink(old).catch(() => {})
+      }
+      broadcast('menu')
+      return { ok: true, imageUrl: url }
+    })
+
+    scope.delete('/api/admin/categories/:id/image', async (req) => {
+      requireRole(user(req), ['manager'])
+      const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
+      const category = await db.one<any>(`SELECT image_url FROM categories WHERE id=$1`, [id])
+      await db.one(`UPDATE categories SET image_url=NULL WHERE id=$1 RETURNING id`, [id])
+      if (category?.image_url?.startsWith('/uploads/')) {
+        const old = path.join(process.cwd(), 'var', category.image_url.replace(/^\/uploads\//, 'uploads/'))
+        unlink(old).catch(() => {})
+      }
+      broadcast('menu')
+      return { ok: true }
     })
   })
 

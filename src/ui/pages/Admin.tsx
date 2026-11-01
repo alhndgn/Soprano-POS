@@ -3,6 +3,8 @@ import { api, money, type Role } from '../api.ts'
 import LayoutEditor from '../components/LayoutEditor.tsx'
 import ProductEditor from '../components/ProductEditor.tsx'
 import PrinterSettings from '../components/PrinterSettings.tsx'
+import SettingsPanel from '../components/SettingsPanel.tsx'
+import { useApp } from '../App.tsx'
 
 type MenuRow = Awaited<ReturnType<typeof api.adminMenu>>[number]
 type StaffRow = Awaited<ReturnType<typeof api.staff>>[number]
@@ -10,7 +12,9 @@ type StaffRow = Awaited<ReturnType<typeof api.staff>>[number]
 const ROLE_LABEL: Record<Role, string> = { manager: 'Yönetici', cashier: 'Kasiyer', waiter: 'Garson' }
 
 export default function Admin() {
-  const [tab, setTab] = useState<'menu' | 'staff' | 'layout' | 'printers'>('layout')
+  const { boot, refresh } = useApp()
+  const [tab, setTab] = useState<'menu' | 'staff' | 'layout' | 'printers' | 'settings'>('menu')
+  const tableDetail = boot?.prefs?.tableDetail !== false
   const [menu, setMenu] = useState<MenuRow[]>([])
   const [staff, setStaff] = useState<StaffRow[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -19,7 +23,6 @@ export default function Admin() {
   const [uploading, setUploading] = useState<number | null>(null)
   const [editor, setEditor] = useState<{ open: boolean; id: number | null }>({ open: false, id: null })
   const [menuFilter, setMenuFilter] = useState<'all' | 'active' | 'passive'>('all')
-  const [ver, setVer] = useState<{ version: string; commit: string } | null>(null)
 
   const load = () => {
     api.adminMenu().then(setMenu).catch((e) => setError(e.message))
@@ -27,10 +30,6 @@ export default function Admin() {
   }
 
   useEffect(load, [])
-
-  useEffect(() => {
-    api.version().then(setVer).catch(() => {})
-  }, [])
 
   useEffect(() => {
     if (!ok) return
@@ -56,6 +55,27 @@ export default function Admin() {
     try {
       await api.deleteImage(id)
       load()
+    } catch (e: any) {
+      setError(e.message)
+    }
+  }
+
+  const uploadCategory = async (id: number, file?: File | null) => {
+    if (!file) return
+    setError(null)
+    try {
+      await api.uploadCategoryImage(id, file)
+      await refresh()
+      setOk('Kategori görseli güncellendi')
+    } catch (e: any) {
+      setError(e.message)
+    }
+  }
+
+  const removeCategoryImage = async (id: number) => {
+    try {
+      await api.deleteCategoryImage(id)
+      await refresh()
     } catch (e: any) {
       setError(e.message)
     }
@@ -89,16 +109,7 @@ export default function Admin() {
     <div className="page">
       <div className="page-head">
         <div>
-          <p className="eyebrow">AYARLAR VE MENÜ</p>
           <h1>Yönetim</h1>
-          <div className="sub">
-            Masa düzeni · menü ve görseller · personel · yazıcılar
-            {ver && (
-              <span className="version-pill" title="Yüklü sürüm">
-                v{ver.version} · {ver.commit}
-              </span>
-            )}
-          </div>
         </div>
       </div>
 
@@ -106,9 +117,11 @@ export default function Admin() {
       {ok && !error && <div className="toast ok" role="status">{ok}</div>}
 
       <div className="tabs" role="tablist" aria-label="Yönetim bölümleri">
-        <button type="button" role="tab" aria-selected={tab === 'layout'} className={`tab${tab === 'layout' ? ' on' : ''}`} onClick={() => setTab('layout')}>
-          Masa Düzeni
-        </button>
+        {tableDetail && (
+          <button type="button" role="tab" aria-selected={tab === 'layout'} className={`tab${tab === 'layout' ? ' on' : ''}`} onClick={() => setTab('layout')}>
+            Masa Düzeni
+          </button>
+        )}
         <button type="button" role="tab" aria-selected={tab === 'menu'} className={`tab${tab === 'menu' ? ' on' : ''}`} onClick={() => setTab('menu')}>
           Menü ({menu.length})
         </button>
@@ -118,11 +131,46 @@ export default function Admin() {
         <button type="button" role="tab" aria-selected={tab === 'printers'} className={`tab${tab === 'printers' ? ' on' : ''}`} onClick={() => setTab('printers')}>
           Yazıcılar
         </button>
+        <button type="button" role="tab" aria-selected={tab === 'settings'} className={`tab${tab === 'settings' ? ' on' : ''}`} onClick={() => setTab('settings')}>
+          Ayarlar
+        </button>
       </div>
 
-      {tab === 'layout' && <LayoutEditor onError={setError} />}
+      {tab === 'layout' && tableDetail && <LayoutEditor onError={setError} />}
+
+      {tab === 'settings' && <SettingsPanel onOk={setOk} onError={setError} />}
 
       {tab === 'printers' && <PrinterSettings onError={setError} onOk={setOk} />}
+
+      {tab === 'menu' && (
+        <div className="panel category-panel">
+          <div className="panel-head">
+            <h3>Kategoriler</h3>
+            <span className="pill">görsel eklemek için resme dokun</span>
+          </div>
+          <div className="category-strip">
+            {(boot?.menu ?? []).map((c) => (
+              <div className="cat-admin" key={c.id}>
+                <label className="cat-admin-img" title={`${c.name} görseli`}>
+                  {c.imageUrl ? <img src={c.imageUrl} alt={c.name} /> : <span aria-hidden="true">{c.emoji}</span>}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    hidden
+                    onChange={(e) => void uploadCategory(c.id, e.target.files?.[0])}
+                  />
+                </label>
+                <b>{c.name}</b>
+                {c.imageUrl && (
+                  <button type="button" className="link-btn" onClick={() => void removeCategoryImage(c.id)}>
+                    kaldır
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {tab === 'menu' && (
         <div className="panel">

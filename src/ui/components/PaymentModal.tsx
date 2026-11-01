@@ -10,6 +10,8 @@ import { money, type Discount, type Order, type PaymentInput, type PaymentPayloa
 
 type Props = {
   order: Order
+  /** true: tüm satırlar seçili başlar (ayarlardan kontrol edilir) */
+  preselect?: boolean
   onClose: () => void
   onSubmit: (payload: PaymentPayload) => Promise<PaymentResult>
   onDone: (result: PaymentResult) => void | Promise<void>
@@ -43,10 +45,12 @@ function discountFor(gross: number, mode: DiscountMode, value: string): number {
   return Math.min(gross, parseCents(value))
 }
 
-export default function PaymentModal({ order, onClose, onSubmit, onDone, onError }: Props) {
+export default function PaymentModal({ order, preselect = true, onClose, onSubmit, onDone, onError }: Props) {
   const lockedDiscount = order.payments.length > 0 || order.discount.amount > 0
   const initialMode: DiscountMode = order.discount.type
-  const [selection, setSelection] = useState<PaymentSelection>(() => defaultPaymentSelection(order.lines))
+  const [selection, setSelection] = useState<PaymentSelection>(() =>
+    preselect ? defaultPaymentSelection(order.lines) : ({} as PaymentSelection),
+  )
   const [method, setMethod] = useState<'cash' | 'card'>('cash')
   const [discountMode, setDiscountMode] = useState<DiscountMode>(initialMode)
   const [discountText, setDiscountText] = useState(

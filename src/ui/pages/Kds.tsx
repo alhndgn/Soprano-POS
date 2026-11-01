@@ -78,9 +78,7 @@ export default function Kds() {
     <div className="page">
       <div className="page-head">
         <div>
-          <p className="eyebrow">MUTFAK EKRANI</p>
-          <h1>Mutfak Ekranı</h1>
-          <div className="sub">Siparişleri sırayla hazırla, durumu tek dokunuşla güncelle.</div>
+          <h1>Mutfak</h1>
         </div>
         <div className="head-actions">
           <span className="pill ok live" role="status">{lines.length} aktif satır</span>

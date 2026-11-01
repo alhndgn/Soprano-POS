@@ -1257,6 +1257,144 @@ small { font-size: 12px; }
 .takeaway-modal { width: min(420px, 100%); }
 .kpi-sub { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; font-weight: 600; }
 
+
+
+/* ---------- kategori görselleri (yönetim) ---------- */
+.category-panel { margin-bottom: 14px; }
+.category-strip { display: flex; gap: 14px; overflow-x: auto; padding: 14px 18px 18px; }
+.cat-admin { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 96px; flex: 0 0 auto; }
+.cat-admin-img {
+  width: 84px; height: 84px; border-radius: 18px; overflow: hidden; cursor: pointer;
+  display: grid; place-items: center; font-size: 30px;
+  border: 1px dashed var(--line-strong); background: var(--bg);
+}
+.cat-admin-img:hover { border-color: var(--accent); }
+.cat-admin-img img { width: 100%; height: 100%; object-fit: cover; }
+.cat-admin b { font-size: 11.5px; text-align: center; line-height: 1.2; }
+.cat-admin .link-btn { font-size: 10.5px; color: var(--danger); }
+
+/* ---------- sipariş ekranı v2: yatay kategoriler ---------- */
+.order-layout.order-layout-v2 { grid-template-columns: minmax(0, 1fr) 376px; }
+.cat-bar {
+  display: flex; align-items: center; gap: 8px;
+  overflow-x: auto; padding: 10px 14px;
+  border-bottom: 1px solid var(--line); background: var(--panel);
+  position: sticky; top: 0; z-index: 5; scrollbar-width: thin;
+}
+.cat-tile {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 5px 13px 5px 5px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--panel);
+  color: var(--muted); font-size: 12.5px; font-weight: 650; white-space: nowrap;
+  transition: .14s ease;
+}
+.cat-tile:hover { border-color: var(--line-strong); color: var(--text); }
+.cat-tile.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-2); }
+.cat-tile-img { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; }
+.cat-tile-emoji { width: 30px; height: 30px; display: grid; place-items: center; font-size: 16px; background: var(--bg); border-radius: 50%; }
+.cat-back { margin-left: auto; flex: 0 0 auto; }
+
+/* ---------- basit masa ızgarası ---------- */
+.table-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 12px; }
+.table-tile {
+  min-height: 104px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 5px;
+  padding: 14px; border: 1px solid var(--line); border-radius: 16px;
+  background: var(--panel); color: var(--text); text-align: left; transition: .14s ease;
+}
+.table-tile:hover { border-color: var(--accent-line); transform: translateY(-1px); }
+.table-tile b { font-size: 15px; }
+.table-tile small { color: var(--muted); font-size: 11.5px; }
+.table-tile.busy { border-color: var(--accent-line); background: var(--accent-soft); }
+.table-tile-total { font-weight: 800; font-size: 17px; font-variant-numeric: tabular-nums; }
+.floor-tab.add-table { border-style: dashed; color: var(--accent-2); }
+
+/* ---------- kaç kişi? ---------- */
+.guest-modal { width: min(360px, 100%); text-align: center; }
+.guest-stepper { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 16px 0 6px; }
+.guest-stepper button {
+  width: 50px; height: 50px; border-radius: 14px; border: 1px solid var(--line-strong);
+  background: var(--panel); color: var(--text); font-size: 22px; font-weight: 700;
+}
+.guest-stepper button:hover { border-color: var(--accent); color: var(--accent-2); }
+.guest-input {
+  width: 96px; height: 58px; text-align: center; font-size: 26px; font-weight: 800;
+  border: 1px solid var(--line-strong); border-radius: 14px; background: var(--panel); color: var(--text);
+}
+
+/* ---------- ayarlar ---------- */
+.settings-panel { display: flex; flex-direction: column; gap: 14px; max-width: 900px; }
+.settings-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+.settings-row:last-child { border-bottom: 0; }
+.settings-row b { font-size: 14px; }
+.settings-row p { margin: 3px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; max-width: 54ch; }
+.switch {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-width: 104px; padding: 8px 14px; border-radius: 999px;
+  border: 1px solid var(--line-strong); background: var(--bg); color: var(--muted);
+  font-size: 12px; font-weight: 700;
+}
+.switch-dot { width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+.switch.on { border-color: var(--ok-line); background: var(--ok-soft); color: var(--ok); }
+.settings-note { padding: 16px 18px; }
+.settings-note p { margin: 6px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+
+/* ---------- gel al ekranı ---------- */
+.takeaway-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+.takeaway-card {
+  display: flex; flex-direction: column; gap: 8px; text-align: left;
+  padding: 16px; border-radius: 16px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--text); transition: .14s ease;
+}
+.takeaway-card:hover { border-color: var(--warn-line); background: var(--warn-soft); transform: translateY(-1px); }
+.takeaway-card-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.takeaway-card-top b { font-size: 15px; }
+.takeaway-card-total { font-weight: 800; font-variant-numeric: tabular-nums; }
+.takeaway-card-meta { display: flex; flex-wrap: wrap; gap: 10px; color: var(--muted); font-size: 11.5px; }
+.takeaway-card-state { font-size: 11px; font-weight: 700; color: var(--accent-2); }
+.takeaway-card-state.sent { color: var(--ok); }
+.takeaway-empty { padding: 28px; }
+.takeaway-empty b { font-size: 15px; }
+.takeaway-empty p { margin: 6px 0 0; color: var(--muted); font-size: 12.5px; }
+
+/* ---------- rapor filtreleri ---------- */
+.report-filters { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; width: 100%; justify-content: flex-end; }
+.range-inputs { display: flex; align-items: center; gap: 6px; }
+.range-inputs .input { width: 152px; }
+.bar-qty { min-width: 42px; text-align: right; color: var(--dim); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+
+/* ---------- sepet satırı detay ---------- */
+.line-open { border: 0; background: transparent; padding: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.line-open:hover { text-decoration: underline; text-decoration-color: var(--dim); text-underline-offset: 3px; }
+.line-detail { width: min(440px, 100%); }
+.line-detail-block { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+.line-detail-block > span { color: var(--muted); font-size: 11.5px; font-weight: 700; }
+
+/* ---------- ödeme ekranı: tek ekrana sığdır ---------- */
+.payment-backdrop { padding: 10px; }
+.payment-modal { max-height: calc(100vh - 20px); }
+@media (max-height: 900px) {
+  .payment-head { padding: 14px 18px 12px; }
+  .payment-head h3 { font-size: 19px; }
+  .payment-lines-panel, .payment-summary-panel { padding: 14px 16px; }
+  .payment-foot { padding: 12px 16px 14px; }
+  .payment-line { padding: 9px 11px; }
+  .payment-modal .payment-foot .btn { min-height: 46px; }
+}
+
+/* ---------- koyu tema ---------- */
+[data-theme='dark'] .cat-bar { background: var(--panel); }
+[data-theme='dark'] .cat-tile { background: var(--panel-2); }
+[data-theme='dark'] .cat-tile.on { background: var(--accent-soft); }
+[data-theme='dark'] .table-tile { background: var(--panel); }
+[data-theme='dark'] .table-tile.busy { background: var(--accent-soft); }
+[data-theme='dark'] .guest-stepper button,
+[data-theme='dark'] .guest-input { background: var(--panel-2); }
+[data-theme='dark'] .settings-row { border-color: var(--line); }
+[data-theme='dark'] .switch { background: #131820; }
+[data-theme='dark'] .switch.on { background: var(--ok-soft); }
+[data-theme='dark'] .takeaway-card { background: var(--panel); }
+[data-theme='dark'] .takeaway-card:hover { background: #26221a; }
+
 /* ---------- sürüm bilgisi ---------- */
 .login-version { display: block; margin-top: 6px; font-size: 10.5px; color: var(--dim); letter-spacing: .02em; }
 .version-pill { display: inline-block; margin-left: 10px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--dim); font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums; vertical-align: middle; }
