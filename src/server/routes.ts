@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import { createWriteStream, existsSync } from 'node:fs'
-import { mkdir, unlink } from 'node:fs/promises'
+import { mkdir, readFile, unlink } from 'node:fs/promises'
 import { pipeline } from 'node:stream/promises'
 import path from 'node:path'
 import os from 'node:os'
@@ -22,6 +22,33 @@ import {
   type PaymentDueLine,
   type PricedLine,
 } from './money.ts'
+
+let versionCache: { version: string; commit: string } | null = null
+
+/** package.json sürümü + git kısa commit (güncelleme geldi mi diye bakmak için). */
+async function appVersion(): Promise<{ version: string; commit: string }> {
+  if (versionCache) return versionCache
+  let version = '0.0.0'
+  let commit = 'bilinmiyor'
+  try {
+    const pkg = JSON.parse(await readFile(path.join(process.cwd(), 'package.json'), 'utf8'))
+    version = String(pkg.version ?? '0.0.0')
+  } catch {
+    /* yoksay */
+  }
+  try {
+    const { stdout } = await promisify(execFile)('git', ['rev-parse', '--short', 'HEAD'], {
+      cwd: process.cwd(),
+      timeout: 5000,
+      windowsHide: true,
+    })
+    commit = stdout.trim() || 'bilinmiyor'
+  } catch {
+    /* git yoksa sorun değil */
+  }
+  versionCache = { version, commit }
+  return versionCache
+}
 
 /** Tüm yazıcı tanımları (rol sırasıyla). */
 const listPrinters = () => db.all<PrinterConfig>(`SELECT * FROM printers ORDER BY device, id`)
@@ -205,6 +232,9 @@ export async function registerRoutes(app: FastifyInstance) {
     return { ok: true }
   })
 
+  // ---------- sürüm (giriş gerektirmez) ----------
+  app.get('/api/version', async () => appVersion())
+
   // ---------- korumalı alan ----------
   await app.register(async (scope) => {
     scope.addHook('preHandler', authHook)
@@ -254,6 +284,7 @@ export async function registerRoutes(app: FastifyInstance) {
       const orderByTable = new Map(openOrders.filter((o) => o.table_id).map((o) => [o.table_id, o]))
       return {
         me,
+        version: await appVersion(),
         outlet: outlet?.value ?? {},
         shift,
         // Masaya bağlı olmayan gel al adisyonları

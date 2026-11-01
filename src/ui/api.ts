@@ -65,8 +65,10 @@ export type LayoutFloor = { id: number; name: string; sort: number; tables: Layo
 export type Floor = { id: number; name: string; tables: Table[] }
 export type Shift = { id: number; opened_at: string; opening_float: number } | null
 
+export type AppVersion = { version: string; commit: string }
 export type Bootstrap = {
   me: Me
+  version?: AppVersion
   outlet: { name?: string; footer?: string; address?: string; phone?: string }
   shift: Shift
   floors: Floor[]
@@ -246,6 +248,7 @@ export const api = {
   login: (pin: string) => request<{ user: Me; token: string }>('POST', '/api/auth/pin', { pin }),
   logout: () => request('POST', '/api/auth/logout', {}),
   bootstrap: () => request<Bootstrap>('GET', '/api/bootstrap'),
+  version: () => request<AppVersion>('GET', '/api/version'),
   openShift: (openingFloat = 0) => request('POST', '/api/shift/open', { openingFloat }),
   closeShift: (closingCount: number) => request('POST', '/api/shift/close', { closingCount }),
   createOrder: (tableId: number, guestCount = 1) => request<{ id: number }>('POST', '/api/orders', { tableId, guestCount }),

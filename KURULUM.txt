@@ -74,13 +74,32 @@ Mevcut kasa verisini bu bilgisayardan diğerine taşımak için:
   (Kur.bat'ı çalıştırdıktan SONRA, Soprano POS.bat'tan ÖNCE).
 
 
-7) GÜNCELLEME
--------------
-Yeni sürüm geldiğinde:
-  1. Soprano Kapat.bat ile kapat
-  2. Yeni dosyaları üzerine kopyala — var klasörünü SAKIN silme
-  3. Kur.bat çalıştır (paketler/derleme yenilenir)
-  4. Soprano POS.bat ile aç
+7) GÜNCELLEME (Git ile — tek tık)
+---------------------------------
+Kurulum git ile alındıysa (aşağıdaki "Git ile kurulum"), güncelleme çok kolay:
+
+  1. Guncelle.bat çift tıkla
+     - Uygulamayı kapatır
+     - GitHub'dan son sürümü indirir
+     - Paketleri ve arayüzü yeniler
+     - Uygulamayı yeniden başlatır
+  2. Bitti. var klasörü (veritabanı + görseller) hiç değişmez.
+
+Sürümü görmek için: giriş ekranının altında "v0.1.0 · a1b2c3d" yazar,
+Yönetim sayfasında da aynı etiket görünür.
+
+GIT İLE KURULUM (önerilen, güncelleme için şart)
+  1. Git for Windows kur: https://git-scm.com/download/win
+  2. cmd aç ve çalıştır:
+       git clone https://github.com/KULLANICI/soprano-pos.git C:\Soprano
+  3. Klasörde Kur.bat, sonra Soprano POS.bat çalıştır.
+
+Notlar:
+  - Depo özel (private) ise Git ilk seferde kullanıcı/token ister; bir kez girilir, hatırlanır.
+  - Guncelle.bat yerel kod değişikliklerini SİLER (var klasörü hariç). Müşteri tarafında
+    kod değiştirilmemeli; değişiklik gerekiyorsa burada yapılıp GitHub'a gönderilmeli.
+  - ZIP ile kurulduysa güncelleme: yeni ZIP'i açıp dosyaları üzerine kopyala
+    (var klasörünü koru) + Kur.bat çalıştır.
 
 
 8) SORUN GİDERME

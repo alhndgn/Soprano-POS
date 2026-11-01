@@ -19,6 +19,7 @@ export default function Admin() {
   const [uploading, setUploading] = useState<number | null>(null)
   const [editor, setEditor] = useState<{ open: boolean; id: number | null }>({ open: false, id: null })
   const [menuFilter, setMenuFilter] = useState<'all' | 'active' | 'passive'>('all')
+  const [ver, setVer] = useState<{ version: string; commit: string } | null>(null)
 
   const load = () => {
     api.adminMenu().then(setMenu).catch((e) => setError(e.message))
@@ -26,6 +27,10 @@ export default function Admin() {
   }
 
   useEffect(load, [])
+
+  useEffect(() => {
+    api.version().then(setVer).catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (!ok) return
@@ -86,7 +91,14 @@ export default function Admin() {
         <div>
           <p className="eyebrow">AYARLAR VE MENÜ</p>
           <h1>Yönetim</h1>
-          <div className="sub">Masa düzeni · menü ve görseller · personel · yazıcılar</div>
+          <div className="sub">
+            Masa düzeni · menü ve görseller · personel · yazıcılar
+            {ver && (
+              <span className="version-pill" title="Yüklü sürüm">
+                v{ver.version} · {ver.commit}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 

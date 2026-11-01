@@ -7,6 +7,11 @@ export default function Login({ onDone }: { onDone: () => void }) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [shake, setShake] = useState(false)
+  const [ver, setVer] = useState<{ version: string; commit: string } | null>(null)
+
+  useEffect(() => {
+    api.version().then(setVer).catch(() => {})
+  }, [])
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -82,7 +87,10 @@ export default function Login({ onDone }: { onDone: () => void }) {
         </div>
 
         <div className="pin-err" role="alert" aria-live="polite">{error || (busy ? 'Kontrol ediliyor…' : '')}</div>
-        <div className="login-footnote">Yerel ağ üzerinde güvenli oturum</div>
+        <div className="login-footnote">
+          Yerel ağ üzerinde güvenli oturum
+          {ver && <span className="login-version">v{ver.version} · {ver.commit}</span>}
+        </div>
       </div>
     </main>
   )
