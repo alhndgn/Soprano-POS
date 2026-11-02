@@ -2062,8 +2062,13 @@ async function runPsJson(command: string): Promise<any[]> {
     return Array.isArray(parsed) ? parsed : [parsed]
   } catch (err: any) {
     const stderr = String(err?.stderr ?? '').trim()
-    const first = stderr.split(/\r?\n/).find((l: string) => l.trim()) ?? String(err?.message ?? err)
-    throw new Error(first.replace(/^\s*\+?\s*CategoryInfo.*$/, '').slice(0, 160))
+    const raw = stderr.split(/\r?\n/).find((l: string) => l.trim()) ?? String(err?.message ?? err)
+    // Node'un "Command failed: <komut>" sarmalını at; gerçek nedeni göster.
+    const cleaned = raw
+      .replace(/^Command failed:\s*[\s\S]*?(?=(?:\r?\n|$))/, '')
+      .replace(/^\s*\+?\s*CategoryInfo.*$/, '')
+      .trim()
+    throw new Error((cleaned || raw).slice(0, 200))
   }
 }
 
@@ -2132,7 +2137,9 @@ async function detectWindowsPrinters(): Promise<{ printers: DetectedPrinter[]; v
     errors.push(`kayıt defteri: ${String(e?.message ?? e).slice(0, 80)}`)
   }
 
-  throw new Error(`Yazıcı listesi alınamadı (${errors.join(' | ')})`)
+  throw new Error(
+    `Yazıcı listesi alınamadı. Yazıcıyı Windows'a ekleyin (Ayarlar → Bluetooth ve cihazlar → Yazıcılar ve tarayıcılar), sonra tekrar deneyin. Ayrıntı: ${errors.join(' | ')}`,
+  )
 }
 
 /** Yerel ağdaki 9100 portu açık yazıcıları tarar (LAN keşfi). */
