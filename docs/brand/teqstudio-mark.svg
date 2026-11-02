@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 48 48" role="img" aria-label="TeqStudio">
+  <defs>
+    <linearGradient id="teq" x1="4" y1="2" x2="44" y2="46" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="0.55" stop-color="#4f7cf7"/>
+      <stop offset="1" stop-color="#7c5cff"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="14" fill="url(#teq)"/>
+  <path d="M14 16.5h20M24 16.5v13" stroke="#ffffff" stroke-width="4.6" stroke-linecap="round"/>
+  <circle cx="24" cy="35" r="3.2" fill="#ffffff" fill-opacity="0.9"/>
+</svg>

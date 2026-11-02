@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { api, auth, type Bootstrap, type Me } from './api.ts'
+import TeqStudio from './components/TeqStudio.tsx'
 import Login from './pages/Login.tsx'
 import Tables from './pages/Tables.tsx'
 import OrderPage from './pages/Order.tsx'
@@ -194,6 +195,7 @@ export default function App() {
             >
               Çıkış
             </button>
+            <TeqStudio />
           </div>
           </div>
         </aside>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import TeqStudio from '../components/TeqStudio.tsx'
 import { useNavigate } from 'react-router-dom'
 import { api, auth } from '../api.ts'
 
@@ -91,6 +92,7 @@ export default function Login({ onDone }: { onDone: () => void }) {
           Yerel ağ üzerinde güvenli oturum
           {ver && <span className="login-version">v{ver.version} · {ver.commit}</span>}
         </div>
+        <TeqStudio />
       </div>
     </main>
   )

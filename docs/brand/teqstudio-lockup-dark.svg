@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="96" viewBox="0 0 360 96" role="img" aria-label="developed by TeqStudio">
+  <defs>
+    <linearGradient id="teq" x1="4" y1="2" x2="44" y2="46" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="0.55" stop-color="#4f7cf7"/>
+      <stop offset="1" stop-color="#7c5cff"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(8 24)">
+    <rect width="48" height="48" rx="14" fill="url(#teq)"/>
+    <path d="M14 16.5h20M24 16.5v13" stroke="#ffffff" stroke-width="4.6" stroke-linecap="round"/>
+    <circle cx="24" cy="35" r="3.2" fill="#ffffff" fill-opacity="0.9"/>
+  </g>
+  <text x="72" y="44" font-family="Segoe UI, system-ui, -apple-system, Arial, sans-serif" font-size="11" letter-spacing="2.4" fill="#8ea0b8">DEVELOPED BY</text>
+  <text x="71" y="70" font-family="Segoe UI, system-ui, -apple-system, Arial, sans-serif" font-size="24" font-weight="700" letter-spacing="-0.3" fill="#eef3fa">TeqStudio</text>
+</svg>

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Soprano POS — pizzacı için masa/adisyon, mutfak ekranı ve kasa yönetimi",
+  "description": "Soprano POS - restoran satis noktasi. Developed by TeqStudio.",
   "scripts": {
     "dev": "concurrently -n api,ui -c cyan,magenta \"npm:dev:api\" \"npm:dev:ui\"",
     "dev:api": "tsx watch src/server/index.ts",
@@ -36,5 +36,7 @@
     "typescript": "^5.7.2",
     "vite": "^6.0.5",
     "vitest": "^2.1.8"
-  }
+  },
+  "author": "TeqStudio",
+  "license": "MIT"
 }

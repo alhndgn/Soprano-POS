@@ -1260,6 +1260,29 @@ small { font-size: 12px; }
 
 
 
+/* ---------- TeqStudio imzası (filigram) ---------- */
+.studio-badge {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; margin-top: 6px; padding-top: 9px;
+  border-top: 1px solid var(--line);
+  color: var(--muted); opacity: .5;
+  transition: opacity .16s ease, color .16s ease;
+  user-select: none;
+}
+.studio-badge:hover { opacity: .95; color: var(--accent-2); }
+.studio-badge span { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+.sidebar .studio-badge { flex-direction: column; gap: 5px; text-align: center; }
+.sidebar .studio-badge span { align-items: center; }
+.sidebar .studio-badge em { font-size: 6.2px; letter-spacing: .12em; white-space: nowrap; }
+.sidebar .studio-badge b { font-size: 9px; white-space: nowrap; }
+.studio-badge em {
+  font-style: normal; font-size: 7px; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--dim);
+}
+.studio-badge b { font-size: 8.5px; font-weight: 700; letter-spacing: .01em; }
+.teq-mark { flex: 0 0 auto; }
+.login-card .studio-badge { margin-top: 14px; padding-top: 12px; max-width: 210px; opacity: .45; }
+
 /* ---------- mutfağa gönder efekti ---------- */
 .kitchen-fx {
   position: fixed; inset: 0; z-index: 80; display: grid; place-items: center;
@@ -1480,6 +1503,9 @@ small { font-size: 12px; }
 
 @media (max-width: 1024px) {
   .sidebar { width: 78px; flex-basis: 78px; padding: 14px 6px; }
+  .studio-badge { gap: 4px; }
+  .sidebar .studio-badge em { font-size: 5.8px; }
+  .sidebar .studio-badge b { font-size: 8.2px; }
   .brand-mark { width: 40px; height: 40px; border-radius: 13px; }
   .kds-board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
