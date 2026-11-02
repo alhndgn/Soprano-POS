@@ -206,7 +206,8 @@ Issue ve PR açabilirsiniz. Büyük değişiklikler için önce bir issue'da kon
 <p align="center">
   <img src="docs/brand/teqstudio-mark.svg" width="30" alt="TeqStudio"><br>
   <b>developed by TeqStudio</b><br>
-  <sub>Dünya açık kaynak kodu destekleyen geliştiriciler sayesinde dönüyor.<br>Bizim de dönmesinde katkımız olsun.</sub>
+  <sub>Dünya açık kaynak kodu destekleyen geliştiriciler sayesinde dönüyor.<br>Bizim de dönmesinde katkımız olsun.</sub><br><br>
+  <sub>© 2026 TeqStudio</sub>
 </p>
 
 ## Lisans
