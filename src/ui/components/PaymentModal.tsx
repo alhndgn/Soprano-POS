@@ -286,7 +286,9 @@ export default function PaymentModal({ order, preselect = true, onClose, onSubmi
                 ))}
                 <input className="input" aria-label="İskonto değeri" disabled={lockedDiscount || discountMode === 'none'} inputMode="decimal" placeholder={discountMode === 'percent' ? '0' : '0,00'} value={discountText} onChange={(e) => setDiscountText(e.target.value)} />
               </div>
-              <div className="discount-result"><span>İskonto tutarı</span><b>− {money(discountTotal)}</b></div>
+              {discountTotal > 0 && (
+                <div className="discount-result"><span>İskonto tutarı</span><b>− {money(discountTotal)}</b></div>
+              )}
             </div>
 
             <div className="payment-section">

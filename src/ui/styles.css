@@ -434,8 +434,11 @@ small { font-size: 12px; }
 
 @keyframes popIn { from { opacity: 0; transform: translateY(-4px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes routeIn { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+/* Sayfa geçişi yalnızca opaklık: transform, position:fixed katmanlarını
+   (ödeme/modal) sayfaya göre konumlandırıp ekran dışına taşırıyordu. */
+@keyframes routeFade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes successPop { 0% { opacity: 0; transform: scale(.65); } 55% { opacity: 1; transform: scale(1.08); } 100% { opacity: 1; transform: scale(1); } }
-.route-stage { min-height: 100%; animation: routeIn .22s ease-out; }
+.route-stage { min-height: 100%; animation: routeFade .18s ease-out; }
 .payment-success-overlay { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; align-content: center; gap: 8px; background: rgba(7, 35, 24, .74); color: #fff; backdrop-filter: blur(5px); animation: routeIn .18s ease-out both; }
 .payment-success-mark { width: 86px; height: 86px; display: grid; place-items: center; border-radius: 50%; background: #18a873; border: 6px solid rgba(255,255,255,.72); font-size: 48px; font-weight: 800; box-shadow: 0 0 0 14px rgba(24,168,115,.18); animation: successPop .42s cubic-bezier(.2,.8,.2,1) both; }
 .payment-success-overlay b { font-size: 24px; letter-spacing: -.02em; }
@@ -609,7 +612,7 @@ small { font-size: 12px; }
 .payment-head h3 { margin: 0; font-size: 22px; letter-spacing: -.02em; }
 .payment-body { min-height: 0; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(340px, .85fr); overflow: hidden; }
 .payment-lines-panel { min-width: 0; padding: 20px 22px; overflow-y: auto; background: #fbfcfd; border-right: 1px solid var(--line); }
-.payment-summary-panel { min-width: 0; padding: 20px 22px; overflow-y: auto; }
+.payment-summary-panel { min-width: 0; padding: 16px 18px; overflow-y: auto; }
 .payment-section-head, .payment-section-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .payment-section-head { margin-bottom: 12px; }
 .payment-section-head h4, .payment-section-title h4 { margin: 0; font-size: 14px; }
@@ -638,17 +641,17 @@ small { font-size: 12px; }
 .payment-qty button { width: 28px; height: 27px; border: 0; border-radius: 6px; background: transparent; color: var(--text); font-size: 16px; }
 .payment-qty button:hover { background: var(--accent-soft); }
 .payment-qty b { min-width: 34px; text-align: center; font-size: 11px; font-variant-numeric: tabular-nums; }
-.payment-total-card { padding: 16px 17px; border: 1px solid var(--accent-line); border-radius: 16px; background: linear-gradient(145deg, #fff6f6, #fff); }
+.payment-total-card { padding: 12px 15px; border: 1px solid var(--accent-line); border-radius: 16px; background: linear-gradient(145deg, #fff6f6, #fff); }
 .payment-total-card span, .payment-total-card small { display: block; color: var(--muted); font-size: 11px; }
-.payment-total-card strong { display: block; margin: 6px 0 5px; color: var(--text); font-size: 38px; line-height: 1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
-.payment-section { margin-top: 17px; padding-top: 15px; border-top: 1px solid var(--line); }
+.payment-total-card strong { display: block; margin: 4px 0 3px; color: var(--text); font-size: 32px; line-height: 1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.payment-section { margin-top: 13px; padding-top: 11px; border-top: 1px solid var(--line); }
 .discount-modes { display: grid; grid-template-columns: repeat(3, 54px) minmax(0, 1fr); gap: 8px; margin-top: 10px; }
 .discount-mode { min-height: 46px; font-size: 14px; border: 1px solid var(--line-strong); border-radius: 9px; background: #fff; color: var(--muted); font-weight: 750; }
 .discount-mode.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-2); }
 .discount-mode:disabled { opacity: .72; cursor: not-allowed; }
 .discount-result, .change-row { display: flex; align-items: center; justify-content: space-between; margin-top: 9px; color: var(--muted); font-size: 12px; }
 .discount-result b { color: var(--danger); font-variant-numeric: tabular-nums; }
-.payment-method-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 9px; }
+.payment-method-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 7px; }
 .payment-method-card { min-height: 76px; display: grid; grid-template-columns: 28px 1fr; grid-template-rows: 1fr 1fr; column-gap: 8px; align-items: center; padding: 10px; border: 1px solid var(--line-strong); border-radius: 12px; background: #fff; color: var(--text); text-align: left; }
 .payment-method-card > span { grid-row: 1 / span 2; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 9px; background: #f1f3f6; color: var(--muted); font-weight: 800; }
 .payment-method-card b { font-size: 15px; }
@@ -657,14 +660,14 @@ small { font-size: 12px; }
 .payment-method-card.on > span { background: var(--accent); color: #fff; }
 .payment-method-card.card.on { border-color: #7b9bc5; background: #f1f6fc; }
 .payment-method-card.card.on > span { background: #315d91; }
-.payment-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.payment-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .payment-inputs label { display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: 12.5px; font-weight: 700; }
 .payment-inputs label:last-child { grid-column: 1 / -1; }
-.payment-money-input { font-size: 19px; font-weight: 750; font-variant-numeric: tabular-nums; padding: 13px 14px; }
+.payment-money-input { font-size: 17px; font-weight: 750; font-variant-numeric: tabular-nums; padding: 10px 12px; }
 .payment-inputs label small { display: inline; font-weight: 500; }
-.change-row { grid-column: 1 / -1; margin-top: -1px; padding: 12px 14px; border-radius: 11px; background: var(--ok-soft); color: var(--ok); font-size: 13.5px; border: 1px solid var(--ok-line); }
-.change-row b { font-size: 21px; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
-.staged-payments { margin-top: 17px; padding-top: 15px; border-top: 1px solid var(--line); }
+.change-row { grid-column: 1 / -1; margin-top: -1px; padding: 9px 12px; border-radius: 11px; background: var(--ok-soft); color: var(--ok); font-size: 13px; border: 1px solid var(--ok-line); }
+.change-row b { font-size: 18px; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.staged-payments { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
 .staged-row { display: flex; justify-content: space-between; padding: 7px 0; color: var(--muted); font-size: 12px; border-bottom: 1px solid var(--line); }
 .staged-row b { color: var(--text); font-variant-numeric: tabular-nums; }
 .payment-error { margin-top: 12px; padding: 9px 10px; border: 1px solid #f3c2c2; border-radius: 9px; background: var(--danger-soft); color: var(--danger); font-size: 12px; }
@@ -1263,6 +1266,37 @@ small { font-size: 12px; }
 
 
 
+
+/* ---------- ödeme: kısa ekranlarda tek ekrana sığdır ---------- */
+@media (max-height: 860px) {
+  .payment-modal { max-height: calc(100vh - 12px); }
+  .payment-head { padding: 13px 18px 11px; }
+  .payment-head h3 { font-size: 18px; }
+  .payment-lines-panel { padding: 14px 16px; }
+  .payment-summary-panel { padding: 12px 14px; }
+  .payment-total-card { padding: 10px 12px; border-radius: 14px; }
+  .payment-total-card strong { font-size: 27px; margin: 3px 0 2px; }
+  .payment-section { margin-top: 10px; padding-top: 8px; }
+  .payment-method-card { min-height: 62px; padding: 8px; }
+  .payment-method-card b { font-size: 14px; }
+  .payment-inputs label { font-size: 11.5px; gap: 4px; }
+  .payment-money-input { font-size: 15.5px; padding: 8px 10px; }
+  .change-row { padding: 7px 10px; font-size: 12px; }
+  .change-row b { font-size: 16px; }
+  .staged-payments { margin-top: 10px; padding-top: 8px; }
+  .payment-foot { padding: 10px 14px 12px; }
+  .payment-foot .btn { min-height: 44px; }
+}
+
+@media (max-height: 760px) {
+  .payment-head .sub, .payment-head .panel-kicker { display: none; }
+  .payment-total-card strong { font-size: 24px; }
+  .payment-section { margin-top: 8px; padding-top: 6px; }
+  .payment-method-card { min-height: 54px; }
+  .payment-method-card small { display: none; }
+  .payment-money-input { padding: 7px 9px; }
+}
+
 /* ---------- TeqStudio imzası (filigram) ---------- */
 .studio-badge {
   display: flex; align-items: center; justify-content: center; gap: 6px;
@@ -1497,7 +1531,8 @@ small { font-size: 12px; }
   .tables-layout.simple { grid-template-columns: minmax(0, 1fr); }
   .two-col { grid-template-columns: minmax(0, 1fr); }
   .payment-body { grid-template-columns: minmax(0, 1fr); overflow-y: auto; }
-  .payment-lines-panel { border-right: 0; border-bottom: 1px solid var(--line); max-height: 34vh; }
+  .payment-lines-panel { border-right: 0; border-bottom: 1px solid var(--line); max-height: none; overflow: visible; }
+  .payment-summary-panel { overflow: visible; }
   .report-filters { justify-content: flex-start; }
   .takeaway-grid { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
   .data-table { min-width: 560px; }
