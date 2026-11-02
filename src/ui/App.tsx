@@ -167,7 +167,6 @@ export default function App() {
           </nav>
           <div className="sidebar-foot">
             <div className="who">
-              <span className="avatar">{me?.name?.[0]}</span>
               <div className="who-copy">
                 <b>{me?.name}</b>
                 <small>{me?.role === 'manager' ? 'Yönetici' : me?.role === 'cashier' ? 'Kasiyer' : 'Garson'}</small>

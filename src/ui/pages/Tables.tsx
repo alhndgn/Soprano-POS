@@ -175,19 +175,20 @@ export default function Tables() {
                       height: `${(p.h / CANVAS_H) * 100}%`,
                     }}
                     disabled={busy === t.id}
-                    aria-label={`${t.name}${o ? `, ${money(o.total)} açık adisyon` : `, ${t.seats} kişilik boş masa`}`}
+                    aria-label={`${t.name}${o ? `, ${money(o.total)} açık adisyon, ${elapsed(o.opened_at)}` : ', boş masa'}`}
                     onClick={() => openTable(t.id, t.name, o?.id)}
                   >
                     <b>{t.name}</b>
                     {o ? (
                       <>
                         <span className="plan-total">{money(o.total)}</span>
-                        <span className="plan-meta">
-                          {o.line_count} ürün · {elapsed(o.opened_at)}
+                        <span className="plan-meta plan-time">
+                          <span aria-hidden="true">⏱</span> {elapsed(o.opened_at)}
+                          {o.guest_count > 0 && <em> · {o.guest_count} kişi</em>}
                         </span>
                       </>
                     ) : (
-                      <span className="plan-meta">{t.seats} kişilik</span>
+                      <span className="plan-meta plan-free">Boş</span>
                     )}
                   </button>
                 )
@@ -216,10 +217,10 @@ export default function Tables() {
                     {o ? (
                       <>
                         <span className="table-tile-total">{money(o.total)}</span>
-                        <small>{o.guest_count} kişi · {elapsed(o.opened_at)}</small>
+                        <small>⏱ {elapsed(o.opened_at)}{o.guest_count > 0 ? ` · ${o.guest_count} kişi` : ''}</small>
                       </>
                     ) : (
-                      <small>{t.seats} kişilik · boş</small>
+                      <small className="table-tile-free">Boş</small>
                     )}
                   </button>
                 )

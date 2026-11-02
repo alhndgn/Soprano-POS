@@ -341,7 +341,7 @@ export default function OrderPage() {
             >
               {order.lines.some((l) => l.status === 'new') ? 'Mutfağa Gönder' : 'Mutfağa gönderildi'}
             </button>
-            <button type="button" className="btn primary" disabled={!canPay || order.lines.length === 0} onClick={() => setPayOpen(true)}>
+            <button type="button" className="btn success" disabled={!canPay || order.lines.length === 0} onClick={() => setPayOpen(true)}>
               Ödeme Al
             </button>
           </div>

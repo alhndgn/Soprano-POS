@@ -11,6 +11,13 @@ export default function Kds() {
   const [lines, setLines] = useState<KdsLine[]>([])
   const [error, setError] = useState<string | null>(null)
   const [tick, setTick] = useState(0)
+  const [fx, setFx] = useState<{ id: number; label: string; tone: 'sent' | 'preparing' | 'ready' } | null>(null)
+
+  const flash = (label: string, tone: 'sent' | 'preparing' | 'ready') => {
+    const id = Date.now()
+    setFx({ id, label, tone })
+    window.setTimeout(() => setFx((cur) => (cur?.id === id ? null : cur)), 1300)
+  }
 
   useEffect(() => {
     let alive = true
@@ -90,6 +97,13 @@ export default function Kds() {
 
       {error && <div className="toast error">{error}</div>}
 
+      {fx && (
+        <div className={`kds-fx kds-fx-${fx.tone}`} key={fx.id} role="status" aria-live="polite">
+          <span className="kds-fx-icon" aria-hidden="true">✓</span>
+          <span>{fx.label}</span>
+        </div>
+      )}
+
       <div className="kds-board" aria-live="polite">
         {COLUMNS.map((col) => {
           const cards = [...grouped.values()].filter((group) => group.status === col.status)
@@ -119,8 +133,9 @@ export default function Kds() {
                   {col.action && (
                     <div className="kds-actions">
                       <button
-                        className={`btn ${col.action.to === 'served' ? 'ghost' : 'primary'} sm`}
+                        className={`btn kds-btn kds-btn-${col.status} sm`}
                         onClick={async () => {
+                          flash(`${group.table} · ${col.action!.label}`, col.status)
                           for (const l of group.lines.filter((line) => line.status === col.status)) await move(l, col.action!.to)
                         }}
                       >

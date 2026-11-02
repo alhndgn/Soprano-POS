@@ -80,7 +80,7 @@ export default function Shift() {
                   <input className="input" inputMode="decimal" value={openingFloat} onChange={(e) => setOpeningFloat(e.target.value)} />
                 </div>
                 <button
-                  className="btn primary block"
+                  className="btn success block"
                   onClick={() => void run(() => api.openShift(Math.round(Number(openingFloat.replace(',', '.')) * 100) || 0))}
                 >
                   Vardiya Aç

@@ -1298,6 +1298,87 @@ small { font-size: 12px; }
   .payment-money-input { padding: 7px 9px; }
 }
 
+
+/* ---------- dolu masa: yeşil, süre ve tutar ---------- */
+.plan-table.busy {
+  background: linear-gradient(165deg, #e9f9f0, #f5fdf9);
+  border-color: #93dcb7;
+  box-shadow: 0 10px 26px rgba(16, 185, 129, .14), inset 0 0 0 1px rgba(16, 185, 129, .18);
+}
+.plan-table.busy b { color: #0b6b45; }
+.plan-table.busy .plan-total { color: #0b6b45; }
+.plan-table .plan-time { color: #2f7a5b; font-weight: 650; }
+.plan-table .plan-time em { font-style: normal; color: #6a9c85; font-weight: 500; }
+.plan-table.free .plan-free { color: var(--dim); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+
+.table-tile.busy {
+  background: linear-gradient(165deg, #e9f9f0, #f5fdf9);
+  border-color: #93dcb7;
+  box-shadow: 0 10px 26px rgba(16, 185, 129, .12);
+}
+.table-tile.busy b { color: #0b6b45; }
+.table-tile.busy .table-tile-total { color: #0b6b45; }
+.table-tile.busy small { color: #2f7a5b; font-weight: 600; }
+.table-tile .table-tile-free { color: var(--dim); letter-spacing: .06em; text-transform: uppercase; font-size: 10px; }
+
+/* ---------- mutfak: renkli aksiyonlar + efekt ---------- */
+.kds-card.sent { border-left-color: #f59e0b; }
+.kds-card.preparing { border-left-color: #3b82f6; }
+.kds-card.ready { border-left-color: #10b981; }
+.kds-col-sent .kds-col-head h3 { color: #b45309; }
+.kds-col-preparing .kds-col-head h3 { color: #1d4ed8; }
+.kds-col-ready .kds-col-head h3 { color: #047857; }
+
+.kds-btn { border: 0; color: #fff; font-weight: 750; letter-spacing: .01em; transition: transform .12s ease, filter .15s ease; }
+.kds-btn:active { transform: scale(.97); }
+.kds-btn:hover { filter: brightness(1.06); }
+.kds-btn-sent { background: linear-gradient(150deg, #f7a928, #ea7c0b); color: #2a1600; }
+.kds-btn-preparing { background: linear-gradient(150deg, #3f8bfd, #1d4ed8); }
+.kds-btn-ready { background: linear-gradient(150deg, #16c98a, #058a5f); }
+
+.kds-fx {
+  position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+  z-index: 95; display: inline-flex; align-items: center; gap: 10px;
+  padding: 11px 20px 11px 12px; border-radius: 999px;
+  font-size: 13.5px; font-weight: 700; color: #fff;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, .28);
+  animation: kdsFx 1.25s cubic-bezier(.2, .9, .3, 1.2) both;
+  pointer-events: none;
+}
+.kds-fx-sent { background: linear-gradient(150deg, #f7a928, #e07a06); color: #241300; }
+.kds-fx-preparing { background: linear-gradient(150deg, #3f8bfd, #1d4ed8); }
+.kds-fx-ready { background: linear-gradient(150deg, #16c98a, #058a5f); }
+.kds-fx-icon {
+  width: 22px; height: 22px; border-radius: 50%;
+  display: grid; place-items: center; background: rgba(255, 255, 255, .28);
+  font-size: 12px; font-weight: 900;
+}
+@keyframes kdsFx {
+  0% { opacity: 0; transform: translate(-50%, -14px) scale(.9); }
+  14% { opacity: 1; transform: translate(-50%, 0) scale(1.02); }
+  22% { transform: translate(-50%, 0) scale(1); }
+  82% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -10px) scale(.98); }
+}
+
+/* ---------- ödeme: 800 px altı ekstra sıkıştırma ---------- */
+@media (max-height: 800px) {
+  .payment-summary-panel { padding: 10px 12px; }
+  .payment-total-card { padding: 8px 11px; border-radius: 12px; }
+  .payment-total-card strong { font-size: 24px; }
+  .payment-total-card small { display: none; }
+  .payment-section { margin-top: 8px; padding-top: 6px; }
+  .payment-section-title h4 { font-size: 12.5px; }
+  .payment-method-card { min-height: 48px; padding: 6px 8px; }
+  .payment-method-card small { display: none; }
+  .payment-inputs label { font-size: 11px; gap: 3px; }
+  .payment-money-input { font-size: 14.5px; padding: 6px 8px; }
+  .change-row { padding: 5px 9px; }
+  .change-row b { font-size: 15px; }
+  .payment-foot { padding: 8px 12px 10px; }
+  .payment-foot .btn { min-height: 40px; }
+}
+
 /* ---------- TeqStudio imzası (filigram) ---------- */
 .studio-badge {
   display: flex; align-items: center; justify-content: center; gap: 6px;
