@@ -628,10 +628,21 @@ function CartLine({
   const voided = line.status === 'void'
   const unitTotal = lineTotal({ ...line, qty: 1 })
   return (
-    <div className={`cart-line${voided ? ' voided' : ''}`}>
+    <div
+      className={`cart-line${voided ? ' voided' : ''}`}
+      onClick={voided ? undefined : onOpen}
+      title={voided ? undefined : 'Detay / not'}
+    >
       <div className="line-top">
         <div>
-          <button type="button" className="line-name line-open" onClick={onOpen}>
+          <button
+            type="button"
+            className="line-name line-open"
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpen()
+            }}
+          >
             {detailOff ? line.name.replace(/\s*\([^)]*\)$/, '') : line.name}
           </button>
           {line.modifiers.length > 0 && (
@@ -655,9 +666,25 @@ function CartLine({
       </div>
       <div className="line-bottom">
         <div className="stepper">
-          <button onClick={() => onQty(Math.max(1, line.qty - 1))}>−</button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onQty(Math.max(1, line.qty - 1))
+            }}
+            aria-label="Adet azalt"
+          >
+            −
+          </button>
           <b>{line.qty}</b>
-          <button onClick={() => onQty(Math.min(MAX_QTY, line.qty + 1))}>+</button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onQty(Math.min(MAX_QTY, line.qty + 1))
+            }}
+            aria-label="Adet artır"
+          >
+            +
+          </button>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span className={`pill${line.status === 'new' ? '' : line.status === 'served' ? ' ok' : ' warn'}`}>
@@ -672,7 +699,14 @@ function CartLine({
                     : 'servis'}
           </span>
           {canVoid && !voided && (
-            <button className="btn ghost sm" style={{ color: 'var(--danger)' }} onClick={onVoid}>
+            <button
+              className="btn ghost sm"
+              style={{ color: 'var(--danger)' }}
+              onClick={(e) => {
+                e.stopPropagation()
+                onVoid()
+              }}
+            >
               İptal
             </button>
           )}
