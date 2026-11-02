@@ -173,16 +173,7 @@ export default function App() {
                 <small>{me?.role === 'manager' ? 'Yönetici' : me?.role === 'cashier' ? 'Kasiyer' : 'Garson'}</small>
               </div>
             </div>
-            <button
-              type="button"
-              className="btn ghost sm theme-toggle"
-              aria-label={theme === 'dark' ? 'Açık temaya geç' : 'Karanlık temaya geç'}
-              title={theme === 'dark' ? 'Açık tema' : 'Karanlık tema'}
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            >
-              <span aria-hidden="true" className="theme-icon">{theme === 'dark' ? '☀' : '☾'}</span>
-              <span className="nav-label">{theme === 'dark' ? 'Açık tema' : 'Karanlık tema'}</span>
-            </button>
+            {/* Tema seçimi Yönetim → Ayarlar'da; menüde yer kaplamasın. */}
             <button
               type="button"
               className="btn ghost sm"

@@ -102,7 +102,8 @@ small { font-size: 12px; }
   border-color: var(--accent-line);
 }
 
-.sidebar-foot { margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.sidebar-foot { margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 6px; padding-top: 10px; }
+.sidebar-foot .who { padding: 2px 0 4px; }
 .who { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
 .who b { font-size: 11px; }
 .who small { color: var(--dim); font-size: 9.5px; }
@@ -1300,7 +1301,7 @@ small { font-size: 12px; }
 /* ---------- TeqStudio imzası (filigram) ---------- */
 .studio-badge {
   display: flex; align-items: center; justify-content: center; gap: 6px;
-  width: 100%; margin-top: 6px; padding-top: 9px;
+  width: 100%; margin-top: 4px; padding-top: 7px;
   border-top: 1px solid var(--line);
   color: var(--muted); opacity: .5;
   transition: opacity .16s ease, color .16s ease;
@@ -1503,7 +1504,12 @@ small { font-size: 12px; }
 [data-theme='dark'] .takeaway-card:hover { background: #26221a; }
 
 /* ---------- sürüm bilgisi ---------- */
-.login-version { display: block; margin-top: 6px; font-size: 10.5px; color: var(--dim); letter-spacing: .02em; }
+.login-footnote { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; line-height: 1.45; text-align: center; }
+.login-version {
+  display: inline-block; margin-top: 4px; padding: 1px 7px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--bg);
+  font-size: 9.5px; color: var(--dim); letter-spacing: .02em; white-space: nowrap;
+}
 .version-pill { display: inline-block; margin-left: 10px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--dim); font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums; vertical-align: middle; }
 
 /* ---------- tablet / responsive ---------- */
