@@ -458,6 +458,51 @@ export const api = {
       `/api/admin/printers/detect?mode=${mode}`,
     ),
   retryPrintJob: (id: number) => request<{ ok: boolean }>('POST', `/api/admin/print/jobs/${id}/retry`, {}),
+
+  // cari (veresiye)
+  customers: (q = '') =>
+    request<{ customers: Customer[] }>('GET', `/api/customers${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+  customer: (id: number) => request<{ customer: Customer; entries: CustomerEntry[] }>('GET', `/api/customers/${id}`),
+  createCustomer: (body: { name: string; phone?: string | null; note?: string | null; creditLimit?: number }) =>
+    request<{ customer: Customer }>('POST', '/api/customers', body),
+  updateCustomer: (id: number, body: Partial<{ name: string; phone: string | null; note: string | null; creditLimit: number; active: boolean }>) =>
+    request<{ customer: Customer }>('PATCH', `/api/admin/customers/${id}`, body),
+  customerPayment: (id: number, body: { amount: number; method: 'cash' | 'card'; note?: string | null }) =>
+    request<{ ok: boolean; applied: number; balance: number }>('POST', `/api/customers/${id}/payments`, body),
+  orderToAccount: (orderId: number, customerId: number) =>
+    request<{ ok: boolean; applied: number; balance: number }>('POST', `/api/orders/${orderId}/account`, { customerId }),
+  accountsReport: () =>
+    request<{
+      total: number
+      debtors: number
+      creditors: number
+      top: { id: number; name: string; phone: string | null; balance: number }[]
+      month: { sales: number; collections: number }
+    }>('GET', '/api/reports/accounts'),
+}
+
+// ---------- cari tipleri ----------
+export type Customer = {
+  id: number
+  name: string
+  phone: string | null
+  note: string | null
+  creditLimit: number
+  balance: number
+  lastAt?: string | null
+  createdAt?: string
+}
+
+export type CustomerEntry = {
+  id: number
+  kind: 'sale' | 'payment' | 'adjust'
+  amount: number
+  method: string | null
+  note: string | null
+  orderId: number | null
+  tableName: string | null
+  createdBy: string | null
+  createdAt: string
 }
 
 // ---------- biçimlendirme ----------

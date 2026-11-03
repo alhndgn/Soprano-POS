@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useApp } from '../App.tsx'
-import { api, elapsed, lineTotal, money, type Order, type OrderLine, type Product } from '../api.ts'
+import { api, elapsed, lineTotal, money, type Customer, type Order, type OrderLine, type Product } from '../api.ts'
 import PaymentModal from '../components/PaymentModal.tsx'
 import VoidOrderModal from '../components/VoidOrderModal.tsx'
 
@@ -36,6 +36,14 @@ export default function OrderPage() {
   const [descOpen, setDescOpen] = useState(false)
   const [lineDetail, setLineDetail] = useState<OrderLine | null>(null)
   const [sentFx, setSentFx] = useState(false)
+  const [successLabel, setSuccessLabel] = useState('Ödeme alındı')
+  const [cariOpen, setCariOpen] = useState(false)
+  const [cariList, setCariList] = useState<Customer[]>([])
+  const [cariQ, setCariQ] = useState('')
+  const [cariPick, setCariPick] = useState<Customer | null>(null)
+  const [cariNewName, setCariNewName] = useState('')
+  const [cariNewPhone, setCariNewPhone] = useState('')
+  const [cariBusy, setCariBusy] = useState(false)
   const [lineNote, setLineNote] = useState('')
 
   // Masalar ekranındaki "Öde" kısayolu: /order/:id?pay=1 → ödeme ekranını aç.
@@ -354,6 +362,19 @@ export default function OrderPage() {
             <button type="button" className="btn success" disabled={!canPay || order.lines.length === 0} onClick={() => setPayOpen(true)}>
               Ödeme Al
             </button>
+            <button
+              type="button"
+              className="btn ghost cari-btn"
+              disabled={!canPay || order.lines.length === 0 || cariBusy}
+              onClick={() => {
+                setCariOpen(true)
+                setCariPick(null)
+                setCariQ('')
+                void api.customers('').then((r) => setCariList(r.customers)).catch((e) => setError(e.message))
+              }}
+            >
+              Cariye Yaz
+            </button>
           </div>
         </div>
       </div>
@@ -609,10 +630,109 @@ export default function OrderPage() {
         </div>
       )}
 
+      {cariOpen && order && (
+        <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && setCariOpen(false)}>
+          <div className="modal cari-modal" role="dialog" aria-modal="true" aria-label="Cariye yaz">
+            <p className="panel-kicker">VERESİYE</p>
+            <h3>Cariye yaz</h3>
+            <div className="sub">
+              {money(totals?.total ?? 0)} · {order.table_name ?? 'Gel Al'} · müşteri hesabına borç olarak işlenir
+            </div>
+
+            <input
+              className="input"
+              placeholder="Müşteri ara…"
+              value={cariQ}
+              onChange={(e) => setCariQ(e.target.value)}
+            />
+            <div className="cari-list">
+              {cariList
+                .filter((c) => !cariQ || c.name.toLowerCase().includes(cariQ.toLowerCase()) || (c.phone ?? '').includes(cariQ))
+                .slice(0, 40)
+                .map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className={`cari-row${cariPick?.id === c.id ? ' on' : ''}`}
+                    onClick={() => {
+                      setCariPick(c)
+                      setCariNewName('')
+                      setCariNewPhone('')
+                    }}
+                  >
+                    <span>
+                      <b>{c.name}</b>
+                      <small>{c.phone || 'telefon yok'}</small>
+                    </span>
+                    <span className={`cari-balance${c.balance > 0 ? ' debt' : ''}`}>{money(c.balance)}</span>
+                  </button>
+                ))}
+              {cariList.length === 0 && <div className="kds-empty">Kayıtlı müşteri yok — aşağıdan ekleyebilirsin</div>}
+            </div>
+
+            <div className="cari-new">
+              <span>Yeni müşteri</span>
+              <input
+                className="input"
+                placeholder="Ad soyad"
+                value={cariNewName}
+                onChange={(e) => {
+                  setCariNewName(e.target.value)
+                  if (e.target.value) setCariPick(null)
+                }}
+              />
+              <input
+                className="input"
+                placeholder="Telefon (opsiyonel)"
+                value={cariNewPhone}
+                onChange={(e) => setCariNewPhone(e.target.value)}
+              />
+            </div>
+
+            {error && <div className="payment-error" role="alert">{error}</div>}
+
+            <div className="modal-actions">
+              <button type="button" className="btn" onClick={() => setCariOpen(false)} disabled={cariBusy}>Vazgeç</button>
+              <button
+                type="button"
+                className="btn success"
+                disabled={cariBusy || (!cariPick && cariNewName.trim().length < 2)}
+                onClick={async () => {
+                  if (cariBusy) return
+                  setCariBusy(true)
+                  setError(null)
+                  try {
+                    let customerId = cariPick?.id
+                    if (!customerId) {
+                      const r = await api.createCustomer({
+                        name: cariNewName.trim(),
+                        phone: cariNewPhone.trim() || null,
+                      })
+                      customerId = r.customer.id
+                    }
+                    await api.orderToAccount(orderId, customerId)
+                    setCariOpen(false)
+                    setSuccessLabel('Cariye yazıldı')
+                    setSuccessFx(true)
+                    window.setTimeout(() => navigate('/tables'), 1100)
+                  } catch (e: any) {
+                    setError(e.message)
+                  } finally {
+                    setCariBusy(false)
+                  }
+                }}
+              >
+                {cariBusy ? 'İşleniyor…' : 'Cariye yaz'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {successFx && (
         <div className="payment-success-overlay" role="status" aria-live="polite">
           <div className="payment-success-mark">✓</div>
-          <b>Ödeme alındı</b>
+          <b>{successLabel}</b>
           <span>Adisyon kapatıldı</span>
         </div>
       )}

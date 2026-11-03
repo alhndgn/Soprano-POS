@@ -210,11 +210,15 @@ CREATE INDEX IF NOT EXISTS line_ingredients_idx ON line_ingredients(line_id);
 CREATE TABLE IF NOT EXISTS payments (
   id          serial PRIMARY KEY,
   order_id    integer NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-  method      text NOT NULL CHECK (method IN ('cash','card','other')),
+  method      text NOT NULL CHECK (method IN ('cash','card','other','account')),
   amount      integer NOT NULL,
   taken_by    integer NOT NULL REFERENCES users(id),
   created_at  timestamptz NOT NULL DEFAULT now()
 );
+
+-- Cari (veresiye) ödemeleri için 'account' yöntemini mevcut veritabanlarına ekle.
+ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_method_check;
+ALTER TABLE payments ADD CONSTRAINT payments_method_check CHECK (method IN ('cash','card','other','account'));
 
 -- Eski ödeme kayıtlarını bozmadan tendered/change bilgisi ekle.
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS tendered integer;
@@ -249,6 +253,36 @@ CREATE TABLE IF NOT EXISTS print_jobs (
 );
 
 CREATE INDEX IF NOT EXISTS print_queue_idx ON print_jobs(status) WHERE status = 'queued';
+
+-- ---------- cari (veresiye) hesaplar ----------
+CREATE TABLE IF NOT EXISTS customers (
+  id            serial PRIMARY KEY,
+  name          text NOT NULL,
+  phone         text,
+  note          text,
+  credit_limit  integer NOT NULL DEFAULT 0,
+  active        boolean NOT NULL DEFAULT true,
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS customers_phone_uniq
+  ON customers (phone) WHERE phone IS NOT NULL AND phone <> '';
+
+-- amount: + borç (satış), - alacak (tahsilat). Bakiye = SUM(amount).
+CREATE TABLE IF NOT EXISTS customer_ledger (
+  id          serial PRIMARY KEY,
+  customer_id integer NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  order_id    integer REFERENCES orders(id) ON DELETE SET NULL,
+  kind        text NOT NULL CHECK (kind IN ('sale','payment','adjust')),
+  amount      integer NOT NULL,
+  method      text,
+  note        text,
+  created_by  integer REFERENCES users(id),
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS customer_ledger_customer_idx ON customer_ledger(customer_id);
+CREATE INDEX IF NOT EXISTS customer_ledger_order_idx ON customer_ledger(order_id);
 
 CREATE TABLE IF NOT EXISTS settings (
   key    text PRIMARY KEY,

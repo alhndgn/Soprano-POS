@@ -1974,6 +1974,292 @@ export async function registerRoutes(app: FastifyInstance) {
     })
   })
 
+
+  // ---------- cari (veresiye) hesaplar ----------
+  await app.register(async (scope) => {
+    scope.addHook('preHandler', authHook)
+
+    const balanceOf = async (customerId: number) => {
+      const row = await db.one<{ b: number }>(
+        `SELECT COALESCE(SUM(amount), 0)::int AS b FROM customer_ledger WHERE customer_id=$1`,
+        [customerId],
+      )
+      return row?.b ?? 0
+    }
+
+    scope.get('/api/customers', async (req) => {
+      const { q } = z.object({ q: z.string().trim().max(80).optional() }).parse(req.query)
+      const like = q ? `%${q}%` : null
+      const rows = await db.all<any>(
+        `SELECT c.id, c.name, c.phone, c.note, c.credit_limit, c.created_at,
+                COALESCE((SELECT SUM(l.amount) FROM customer_ledger l WHERE l.customer_id=c.id), 0)::int AS balance,
+                (SELECT max(l.created_at) FROM customer_ledger l WHERE l.customer_id=c.id) AS last_at
+         FROM customers c
+         WHERE c.active AND ($1::text IS NULL OR c.name ILIKE $1 OR c.phone ILIKE $1)
+         ORDER BY balance DESC, c.name ASC
+         LIMIT 300`,
+        [like],
+      )
+      return {
+        customers: rows.map((c) => ({
+          id: c.id,
+          name: c.name,
+          phone: c.phone,
+          note: c.note,
+          creditLimit: c.credit_limit,
+          balance: c.balance,
+          lastAt: c.last_at,
+          createdAt: c.created_at,
+        })),
+      }
+    })
+
+    scope.post('/api/customers', async (req) => {
+      requireRole(user(req), ['manager', 'cashier'])
+      const body = z
+        .object({
+          name: z.string().trim().min(2).max(80),
+          phone: z.string().trim().max(30).optional().nullable(),
+          note: z.string().trim().max(300).optional().nullable(),
+          creditLimit: z.number().int().min(0).max(10_000_000).optional(),
+        })
+        .parse(req.body)
+      const phone = body.phone?.replace(/[^0-9+]/g, '') || null
+      try {
+        const row = await db.one<any>(
+          `INSERT INTO customers (name, phone, note, credit_limit) VALUES ($1,$2,$3,$4)
+           RETURNING id, name, phone, note, credit_limit, created_at`,
+          [body.name, phone, body.note ?? null, body.creditLimit ?? 0],
+        )
+        broadcast('customers')
+        return { customer: { ...row, creditLimit: row.credit_limit, balance: 0 } }
+      } catch (e: any) {
+        if (String(e?.message ?? '').includes('duplicate')) throw httpError(400, 'Bu telefonla kayıtlı müşteri var')
+        throw e
+      }
+    })
+
+    scope.patch('/api/admin/customers/:id', async (req) => {
+      requireRole(user(req), ['manager'])
+      const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
+      const body = z
+        .object({
+          name: z.string().trim().min(2).max(80).optional(),
+          phone: z.string().trim().max(30).optional().nullable(),
+          note: z.string().trim().max(300).optional().nullable(),
+          creditLimit: z.number().int().min(0).max(10_000_000).optional(),
+          active: z.boolean().optional(),
+        })
+        .parse(req.body)
+      const row = await db.one<any>(
+        `UPDATE customers SET
+           name = COALESCE($1, name),
+           phone = COALESCE($2, phone),
+           note = COALESCE($3, note),
+           credit_limit = COALESCE($4, credit_limit),
+           active = COALESCE($5, active)
+         WHERE id=$6
+         RETURNING id, name, phone, note, credit_limit, active`,
+        [
+          body.name ?? null,
+          body.phone === undefined ? null : body.phone,
+          body.note === undefined ? null : body.note,
+          body.creditLimit ?? null,
+          body.active ?? null,
+          id,
+        ],
+      )
+      if (!row) throw httpError(404, 'Müşteri bulunamadı')
+      return { customer: row }
+    })
+
+    scope.get('/api/customers/:id', async (req) => {
+      const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
+      const customer = await db.one<any>(`SELECT * FROM customers WHERE id=$1`, [id])
+      if (!customer) throw httpError(404, 'Müşteri bulunamadı')
+      const entries = await db.all<any>(
+        `SELECT l.id, l.kind, l.amount, l.method, l.note, l.created_at, l.order_id,
+                u.name AS created_by_name,
+                COALESCE(t.name, CASE WHEN o.order_type='takeaway' THEN 'Gel Al' END) AS table_name
+         FROM customer_ledger l
+         LEFT JOIN users u ON u.id = l.created_by
+         LEFT JOIN orders o ON o.id = l.order_id
+         LEFT JOIN tables t ON t.id = o.table_id
+         WHERE l.customer_id=$1
+         ORDER BY l.id DESC
+         LIMIT 500`,
+        [id],
+      )
+      return {
+        customer: {
+          id: customer.id,
+          name: customer.name,
+          phone: customer.phone,
+          note: customer.note,
+          creditLimit: customer.credit_limit,
+          balance: await balanceOf(id),
+          createdAt: customer.created_at,
+        },
+        entries: entries.map((e) => ({
+          id: e.id,
+          kind: e.kind,
+          amount: e.amount,
+          method: e.method,
+          note: e.note,
+          orderId: e.order_id,
+          tableName: e.table_name,
+          createdBy: e.created_by_name,
+          createdAt: e.created_at,
+        })),
+      }
+    })
+
+    scope.post('/api/customers/:id/payments', async (req) => {
+      requireRole(user(req), ['manager', 'cashier'])
+      const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
+      const body = z
+        .object({
+          amount: z.number().int().positive(),
+          method: z.enum(['cash', 'card']).default('cash'),
+          note: z.string().trim().max(200).optional().nullable(),
+        })
+        .parse(req.body)
+      const customer = await db.one<any>(`SELECT id, name FROM customers WHERE id=$1 AND active`, [id])
+      if (!customer) throw httpError(404, 'Müşteri bulunamadı')
+      const balance = await balanceOf(id)
+      if (balance <= 0) throw httpError(400, 'Bu müşterinin borcu yok')
+      const applied = Math.min(body.amount, balance)
+      await db.run(
+        `INSERT INTO customer_ledger (customer_id, kind, amount, method, note, created_by)
+         VALUES ($1, 'payment', $2, $3, $4, $5)`,
+        [id, -applied, body.method, body.note ?? null, user(req).id],
+      )
+      broadcast('customers')
+      return { ok: true, applied, balance: balance - applied }
+    })
+
+    /** Açık adisyonun kalanını müşterinin carisine yaz (veresiye). */
+    scope.post('/api/orders/:id/account', async (req) => {
+      requireRole(user(req), ['manager', 'cashier'])
+      const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
+      const { customerId } = z.object({ customerId: z.number().int() }).parse(req.body)
+      const order = await loadOrder(id)
+      if (!order) throw httpError(404, 'Adisyon bulunamadı')
+      if (order.status !== 'open') throw httpError(400, 'Adisyon açık değil')
+
+      const customer = await db.one<any>(`SELECT * FROM customers WHERE id=$1 AND active`, [customerId])
+      if (!customer) throw httpError(404, 'Müşteri bulunamadı')
+
+      const paidRow = await db.one<{ s: number }>(`SELECT COALESCE(SUM(amount),0)::int AS s FROM payments WHERE order_id=$1`, [id])
+      const remaining = Math.max(0, order.totals.total - (paidRow?.s ?? 0))
+      if (remaining <= 0) throw httpError(400, 'Ödenecek tutar kalmadı')
+
+      const balance = await balanceOf(customerId)
+      if (customer.credit_limit > 0 && balance + remaining > customer.credit_limit) {
+        throw httpError(400, `Kredi limiti aşılıyor (limit ${customer.credit_limit / 100} ₺, bakiye ${balance / 100} ₺)`)
+      }
+
+      await db.run(
+        `INSERT INTO payments (order_id, method, amount, tendered, change_amount, taken_by)
+         VALUES ($1, 'account', $2, $2, 0, $3)`,
+        [id, remaining, user(req).id],
+      )
+      await db.run(
+        `INSERT INTO customer_ledger (customer_id, order_id, kind, amount, note, created_by)
+         VALUES ($1, $2, 'sale', $3, $4, $5)`,
+        [customerId, id, remaining, orderLabel(order), user(req).id],
+      )
+      await db.run(`UPDATE orders SET status='paid', closed_at=now(), customer_name=COALESCE(customer_name,$1) WHERE id=$2`, [
+        customer.name,
+        id,
+      ])
+
+      const meta = (await db.one<any>(`SELECT value FROM settings WHERE key='outlet'`))?.value ?? {}
+      if (await hasPrinter('receipt')) {
+        const prefs = await getPrefs()
+        await db.run(
+          `INSERT INTO print_jobs (kind, device, order_id, payload) VALUES ('receipt','receipt',$1,$2)`,
+          [
+            id,
+            JSON.stringify({
+              outletName: meta.name ?? 'Soprano',
+              orderId: id,
+              tableName: orderLabel(order),
+              staffName: user(req).name,
+              customerName: customer.name,
+              dateISO: new Date().toISOString(),
+              lines: order.lines.map((line: any) => ({
+                name: line.name,
+                qty: line.qty,
+                unitPrice: line.unit_price,
+                modifiers: (line.modifiers ?? []).map((m: any) => m.name),
+                removed: (line.ingredients ?? []).filter((i: any) => i.mode === 'removed').map((i: any) => i.name),
+                added: (line.ingredients ?? []).filter((i: any) => i.mode === 'added').map((i: any) => i.name),
+                total:
+                  (line.unit_price +
+                    (line.modifiers ?? []).reduce((s: number, m: any) => s + m.price, 0) +
+                    (line.ingredients ?? []).filter((i: any) => i.mode === 'added').reduce((s: number, i: any) => s + i.price, 0)) *
+                  line.qty,
+              })),
+              showVat: prefs.vatIncluded,
+              subtotal: order.totals.subtotal,
+              vatLines: order.totals.vatLines,
+              total: order.totals.total,
+              payments: [{ method: 'account', amount: remaining }],
+              change: 0,
+              footer: `${meta.footer ?? ''}${meta.footer ? ' · ' : ''}CARI HESABA YAZILDI`,
+            }),
+          ],
+        )
+      }
+
+      broadcast('paid')
+      return { ok: true, applied: remaining, balance: balance + remaining, order: await loadOrder(id) }
+    })
+
+    /** Manuel düzeltme: + borç, - alacak. */
+    scope.post('/api/admin/customers/:id/adjust', async (req) => {
+      requireRole(user(req), ['manager'])
+      const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
+      const body = z
+        .object({ amount: z.number().int(), note: z.string().trim().max(200).optional().nullable() })
+        .parse(req.body)
+      if (body.amount === 0) throw httpError(400, 'Tutar 0 olamaz')
+      const customer = await db.one<any>(`SELECT id FROM customers WHERE id=$1`, [id])
+      if (!customer) throw httpError(404, 'Müşteri bulunamadı')
+      await db.run(
+        `INSERT INTO customer_ledger (customer_id, kind, amount, note, created_by) VALUES ($1,'adjust',$2,$3,$4)`,
+        [id, body.amount, body.note ?? null, user(req).id],
+      )
+      broadcast('customers')
+      return { ok: true, balance: await balanceOf(id) }
+    })
+
+    scope.get('/api/reports/accounts', async (req) => {
+      requireRole(user(req), ['manager', 'cashier'])
+      const totals = await db.one<any>(
+        `SELECT COALESCE(SUM(bal),0)::int AS total,
+                COUNT(*) FILTER (WHERE bal > 0)::int AS debtors,
+                COUNT(*) FILTER (WHERE bal < 0)::int AS creditors
+         FROM (SELECT customer_id, SUM(amount)::int AS bal FROM customer_ledger GROUP BY customer_id) x`,
+      )
+      const top = await db.all<any>(
+        `SELECT c.id, c.name, c.phone, SUM(l.amount)::int AS balance
+         FROM customer_ledger l JOIN customers c ON c.id=l.customer_id
+         GROUP BY c.id, c.name, c.phone
+         HAVING SUM(l.amount) > 0
+         ORDER BY balance DESC
+         LIMIT 5`,
+      )
+      const month = await db.one<any>(
+        `SELECT COALESCE(SUM(CASE WHEN kind='sale' THEN amount ELSE 0 END),0)::int AS sales,
+                COALESCE(SUM(CASE WHEN kind='payment' THEN -amount ELSE 0 END),0)::int AS collections
+         FROM customer_ledger WHERE created_at >= date_trunc('month', now())`,
+      )
+      return { total: totals?.total ?? 0, debtors: totals?.debtors ?? 0, creditors: totals?.creditors ?? 0, top, month }
+    })
+  })
+
   // ---------- ayarlar (arayüz tercihleri) ----------
   await app.register(async (scope) => {
     scope.addHook('preHandler', authHook)

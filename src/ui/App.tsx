@@ -10,6 +10,7 @@ import Reports from './pages/Reports.tsx'
 import Admin from './pages/Admin.tsx'
 import Shift from './pages/Shift.tsx'
 import Takeaway from './pages/Takeaway.tsx'
+import Accounts from './pages/Accounts.tsx'
 
 type Ctx = {
   boot: Bootstrap | null
@@ -44,6 +45,7 @@ const NAV = [
   { to: '/tables', label: 'Masalar', icon: 'M4 6h16M4 12h16M4 18h16' },
   { to: '/kds', label: 'Mutfak', icon: 'M4 10h16M6 10V6h12v4M7 10v10M17 10v10' },
   { to: '/takeaway', label: 'Gel Al', icon: 'M6 8h12l-1 12H7L6 8zm3 0a3 3 0 016 0' },
+  { to: '/accounts', label: 'Cari', icon: 'M4 7h16v11H4zM4 7l8-3 8 3M8 12h3' },
   { to: '/reports', label: 'Rapor', icon: 'M4 19V5m0 14h16M8 15v-4m4 4V8m4 7v-6' },
   { to: '/admin', label: 'Yönetim', icon: 'M12 4l2.1 4.3 4.7.7-3.4 3.3.8 4.7L12 15l-4.2 2 .8-4.7L5.2 9l4.7-.7L12 4z' },
 ]
@@ -126,7 +128,7 @@ export default function App() {
   const role = me?.role
   const allowed = (to: string) => {
     if (role === 'manager') return true
-    if (to === '/tables' || to === '/kds' || to === '/takeaway') return true
+    if (to === '/tables' || to === '/kds' || to === '/takeaway' || to === '/accounts') return true
     if (to === '/shift') return role === 'cashier'
     return role === 'cashier' && to === '/reports'
   }
@@ -198,6 +200,7 @@ export default function App() {
             <Route path="/takeaway" element={<Takeaway />} />
             <Route path="/order/:id" element={<OrderPage />} />
             <Route path="/kds" element={<Kds />} />
+            <Route path="/accounts" element={<Accounts />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/shift" element={<Shift />} />

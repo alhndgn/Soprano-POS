@@ -128,7 +128,8 @@ export function buildReceipt(p: ReceiptPayload, paperWidth = 80): Buffer {
   e.bold(true).row('TOPLAM', tl(p.total)).bold(false)
   e.line()
   for (const pay of p.payments) {
-    const label = pay.method === 'cash' ? 'Nakit' : pay.method === 'card' ? 'Kredi Karti' : 'Diger'
+    const label =
+      pay.method === 'cash' ? 'Nakit' : pay.method === 'card' ? 'Kredi Karti' : pay.method === 'account' ? 'Cari' : 'Diger'
     e.row(label, tl(pay.amount))
   }
   if (p.change > 0) e.row('Para Ustu', tl(p.change))
