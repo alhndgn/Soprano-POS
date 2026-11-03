@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useApp } from '../App.tsx'
 import { api, type Prefs } from '../api.ts'
 
@@ -7,6 +7,29 @@ type Row = {
   title: string
   desc: string
 }
+
+const FEATURE_ROWS: Row[] = [
+  {
+    key: 'featureCari',
+    title: 'Cari hesap (veresiye)',
+    desc: 'Müşteri hesapları, cariye yazma ve tahsilat ekranı görünür.',
+  },
+  {
+    key: 'featureTableMenu',
+    title: 'Masa işlem menüsü (⋯)',
+    desc: 'Dolu masalarda öde, iptal, yazdır, taşı ve birleştir kısayolları görünür.',
+  },
+  {
+    key: 'featureMutfakFx',
+    title: 'Mutfak efektleri',
+    desc: 'Mutfak ekranında durum değişince renkli bildirim animasyonu oynar.',
+  },
+  {
+    key: 'featureGelAl',
+    title: 'Gel Al modülü',
+    desc: 'Paket/gel al siparişleri menüsü ve ekranı görünür.',
+  },
+]
 
 const ROWS: Row[] = [
   {
@@ -47,6 +70,20 @@ export default function SettingsPanel({ onOk, onError }: { onOk: (m: string) => 
   const [busy, setBusy] = useState<keyof Prefs | null>(null)
 
   const current = prefs ?? boot?.prefs ?? null
+
+  // Panel açıldığında sunucudaki güncel değerleri al (bayat toggle olmasın).
+  useEffect(() => {
+    let alive = true
+    api
+      .settings()
+      .then((r) => {
+        if (alive) setPrefs(r.prefs)
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
 
   const save = async (patch: Partial<Prefs>) => {
     if (!current) return
@@ -119,6 +156,33 @@ export default function SettingsPanel({ onOk, onError }: { onOk: (m: string) => 
             >
               <span className="switch-dot" aria-hidden="true" />
               <span className="switch-text">{current[row.key] ? 'Açık' : 'Kapalı'}</span>
+            </button>
+          </div>
+        ))}
+      </section>
+
+      <section className="panel">
+        <div className="panel-head">
+          <h3>Modüller (eklentiler)</h3>
+          <span className="pill">kapatınca menüden gizlenir</span>
+        </div>
+        {FEATURE_ROWS.map((row) => (
+          <div className="settings-row" key={row.key}>
+            <div>
+              <b>{row.title}</b>
+              <p>{row.desc}</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={current[row.key] !== false}
+              aria-label={row.title}
+              className={`switch${current[row.key] !== false ? ' on' : ''}`}
+              disabled={busy === row.key}
+              onClick={() => void save({ [row.key]: current[row.key] === false } as Partial<Prefs>)}
+            >
+              <span className="switch-dot" aria-hidden="true" />
+              <span className="switch-text">{current[row.key] !== false ? 'Açık' : 'Kapalı'}</span>
             </button>
           </div>
         ))}

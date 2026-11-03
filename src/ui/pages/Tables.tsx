@@ -189,7 +189,9 @@ export default function Tables() {
     }
   }
 
-  const menuButton = (t: Table, orderId: number, total: number, name: string) => (
+  const menuButton = (t: Table, orderId: number, total: number, name: string) => {
+    if (boot?.prefs?.featureTableMenu === false) return null
+    return (
     <button
       type="button"
       className="table-menu-trigger"
@@ -202,7 +204,8 @@ export default function Tables() {
     >
       ⋯
     </button>
-  )
+    )
+  }
 
   return (
     <div className="page">

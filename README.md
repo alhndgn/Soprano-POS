@@ -82,6 +82,12 @@
 - Masadan bağımsız paket siparişleri, müşteri adı ve telefon
 - Ayrı ekran ve ayrı rapor kalemi
 
+**Cari (veresiye)**
+- Müşteri kartı: ad, telefon, not, kredi limiti
+- Adisyonu tek tuşla **cariye yaz**, bakiye ve hareket geçmişi
+- Tahsilat (nakit/kart), kısmi ödeme, manuel düzeltme
+- Aylık cari satış / tahsilat özeti, borçlu listesi, WhatsApp hatırlatma
+
 ## Hızlı başlangıç
 
 ### Windows (kurulum paketi)

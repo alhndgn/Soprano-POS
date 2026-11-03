@@ -73,6 +73,10 @@ export type Prefs = {
   tableDetail: boolean
   tableSections: boolean
   paymentPreselect: boolean
+  featureCari: boolean
+  featureTableMenu: boolean
+  featureMutfakFx: boolean
+  featureGelAl: boolean
   theme: 'light' | 'dark'
 }
 export type Bootstrap = {
@@ -388,6 +392,7 @@ export const api = {
   deleteImage: (productId: number) => request('DELETE', `/api/admin/products/${productId}/image`),
 
   // ayarlar
+  settings: () => request<{ prefs: Prefs }>('GET', '/api/admin/settings'),
   settings: () => request<{ prefs: Prefs }>('GET', '/api/admin/settings'),
   saveSettings: (patch: Partial<Prefs>) => request<{ prefs: Prefs }>('PUT', '/api/admin/settings', patch),
   uploadCategoryImage: async (categoryId: number, file: File) => {

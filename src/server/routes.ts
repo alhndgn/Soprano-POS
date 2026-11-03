@@ -65,6 +65,10 @@ type Prefs = {
   tableSections: boolean
   paymentPreselect: boolean
   theme: 'light' | 'dark'
+  featureCari: boolean
+  featureTableMenu: boolean
+  featureMutfakFx: boolean
+  featureGelAl: boolean
 }
 
 const DEFAULT_PREFS: Prefs = {
@@ -75,6 +79,10 @@ const DEFAULT_PREFS: Prefs = {
   tableSections: true,
   paymentPreselect: false,
   theme: 'light',
+  featureCari: true,
+  featureTableMenu: true,
+  featureMutfakFx: true,
+  featureGelAl: true,
 }
 
 async function getPrefs(): Promise<Prefs> {
@@ -86,6 +94,10 @@ async function getPrefs(): Promise<Prefs> {
     orderDetail: saved.orderDetail !== false,
     tableDetail: saved.tableDetail !== false,
     tableSections: saved.tableSections !== false,
+    featureCari: saved.featureCari !== false,
+    featureTableMenu: saved.featureTableMenu !== false,
+    featureMutfakFx: saved.featureMutfakFx !== false,
+    featureGelAl: saved.featureGelAl !== false,
     paymentPreselect: saved.paymentPreselect === true,
     theme: saved.theme === 'dark' ? 'dark' : 'light',
   }
@@ -2278,6 +2290,10 @@ export async function registerRoutes(app: FastifyInstance) {
           orderDetail: z.boolean().optional(),
           tableDetail: z.boolean().optional(),
           tableSections: z.boolean().optional(),
+          featureCari: z.boolean().optional(),
+          featureTableMenu: z.boolean().optional(),
+          featureMutfakFx: z.boolean().optional(),
+          featureGelAl: z.boolean().optional(),
           paymentPreselect: z.boolean().optional(),
           theme: z.enum(['light', 'dark']).optional(),
         })

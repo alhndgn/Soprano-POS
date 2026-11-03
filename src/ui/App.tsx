@@ -154,7 +154,12 @@ export default function App() {
             </div>
           </div>
           <nav aria-label="Bölümler">
-            {NAV.filter((n) => allowed(n.to)).map((n) => (
+            {NAV.filter(
+              (n) =>
+                allowed(n.to) &&
+                (n.to !== '/accounts' || boot?.prefs?.featureCari !== false) &&
+                (n.to !== '/takeaway' || boot?.prefs?.featureGelAl !== false),
+            ).map((n) => (
               <NavLink key={n.to} to={n.to} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
                 <Icon d={n.icon} />
                 <span className="nav-label">{n.label}</span>
@@ -197,10 +202,16 @@ export default function App() {
           <div className="route-stage" key={location.pathname}>
           <Routes>
             <Route path="/tables" element={<Tables />} />
-            <Route path="/takeaway" element={<Takeaway />} />
+            <Route
+              path="/takeaway"
+              element={boot?.prefs?.featureGelAl === false ? <Navigate to="/tables" replace /> : <Takeaway />}
+            />
             <Route path="/order/:id" element={<OrderPage />} />
             <Route path="/kds" element={<Kds />} />
-            <Route path="/accounts" element={<Accounts />} />
+            <Route
+              path="/accounts"
+              element={boot?.prefs?.featureCari === false ? <Navigate to="/tables" replace /> : <Accounts />}
+            />
             <Route path="/reports" element={<Reports />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/shift" element={<Shift />} />

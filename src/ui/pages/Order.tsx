@@ -362,6 +362,7 @@ export default function OrderPage() {
             <button type="button" className="btn success" disabled={!canPay || order.lines.length === 0} onClick={() => setPayOpen(true)}>
               Ödeme Al
             </button>
+            {prefs?.featureCari !== false && (
             <button
               type="button"
               className="btn ghost cari-btn"
@@ -375,6 +376,7 @@ export default function OrderPage() {
             >
               Cariye Yaz
             </button>
+            )}
           </div>
         </div>
       </div>

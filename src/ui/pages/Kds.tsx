@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, elapsed, type KdsLine } from '../api.ts'
+import { useApp } from '../App.tsx'
 
 const COLUMNS: { status: 'sent' | 'preparing' | 'ready'; title: string; action?: { to: 'preparing' | 'ready' | 'served'; label: string } }[] = [
   { status: 'sent', title: 'Yeni sipariş', action: { to: 'preparing', label: 'Başla' } },
@@ -8,12 +9,14 @@ const COLUMNS: { status: 'sent' | 'preparing' | 'ready'; title: string; action?:
 ]
 
 export default function Kds() {
+  const { boot } = useApp()
   const [lines, setLines] = useState<KdsLine[]>([])
   const [error, setError] = useState<string | null>(null)
   const [tick, setTick] = useState(0)
   const [fx, setFx] = useState<{ id: number; label: string; tone: 'sent' | 'preparing' | 'ready' } | null>(null)
 
   const flash = (label: string, tone: 'sent' | 'preparing' | 'ready') => {
+    if (boot?.prefs?.featureMutfakFx === false) return
     const id = Date.now()
     setFx({ id, label, tone })
     window.setTimeout(() => setFx((cur) => (cur?.id === id ? null : cur)), 1300)
