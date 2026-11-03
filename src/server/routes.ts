@@ -664,6 +664,77 @@ export async function registerRoutes(app: FastifyInstance) {
       return loadOrder(id)
     })
 
+    /** İki açık adisyonu birleştir: kaynak satırlar hedefe taşınır, kaynak iptal olur. */
+    scope.post('/api/orders/:id/merge', async (req) => {
+      const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
+      const { targetOrderId } = z.object({ targetOrderId: z.number().int() }).parse(req.body)
+      if (id === targetOrderId) throw httpError(400, 'Aynı adisyon birleştirilemez')
+
+      const src = await db.one<any>(`SELECT id, status FROM orders WHERE id=$1`, [id])
+      const dst = await db.one<any>(`SELECT id, status FROM orders WHERE id=$1`, [targetOrderId])
+      if (!src || !dst) throw httpError(404, 'Adisyon bulunamadı')
+      if (src.status !== 'open' || dst.status !== 'open') throw httpError(400, 'Yalnızca açık adisyonlar birleştirilir')
+
+      const paid = await db.one<{ c: number }>(`SELECT count(*)::int AS c FROM payments WHERE order_id=$1`, [id])
+      if (paid && paid.c > 0) throw httpError(400, 'Ödeme alınmış adisyon birleştirilemez')
+
+      await db.run(`UPDATE order_lines SET order_id=$1 WHERE order_id=$2`, [targetOrderId, id])
+      await db.run(
+        `UPDATE orders SET status='void', closed_at=now(), void_reason=$1, voided_by=$2, voided_at=now() WHERE id=$3`,
+        [`Adisyon #${targetOrderId} ile birlestirildi`, user(req).id, id],
+      )
+      broadcast()
+      return loadOrder(targetOrderId)
+    })
+
+    /** Ön hesap (ödenmemiş adisyon) fişini kasa yazıcısına gönderir. */
+    scope.post('/api/orders/:id/print', async (req) => {
+      const { id } = z.object({ id: z.coerce.number().int() }).parse(req.params)
+      const order = await loadOrder(id)
+      if (!order) throw httpError(404, 'Adisyon bulunamadı')
+      if (order.status !== 'open') throw httpError(400, 'Adisyon açık değil')
+      if (!(await hasPrinter('receipt'))) throw httpError(400, 'Kasa yazıcısı tanımlı değil (Yönetim → Yazıcılar)')
+
+      const meta = (await db.one<any>(`SELECT value FROM settings WHERE key='outlet'`))?.value ?? {}
+      const prefs = await getPrefs()
+      await db.run(
+        `INSERT INTO print_jobs (kind, device, order_id, payload) VALUES ('receipt','receipt',$1,$2)`,
+        [
+          id,
+          JSON.stringify({
+            outletName: meta.name ?? 'Soprano',
+            orderId: id,
+            tableName: order.table_name ?? `Adisyon #${id}`,
+            staffName: order.staff_name ?? user(req).name,
+            customerName: order.customer_name ?? null,
+            dateISO: new Date().toISOString(),
+            lines: order.lines.map((line: any) => ({
+              name: line.name,
+              qty: line.qty,
+              unitPrice: line.unit_price,
+              modifiers: (line.modifiers ?? []).map((m: any) => m.name),
+              removed: (line.ingredients ?? []).filter((i: any) => i.mode === 'removed').map((i: any) => i.name),
+              added: (line.ingredients ?? []).filter((i: any) => i.mode === 'added').map((i: any) => i.name),
+              total:
+                (line.unit_price +
+                  (line.modifiers ?? []).reduce((s: number, m: any) => s + m.price, 0) +
+                  (line.ingredients ?? []).filter((i: any) => i.mode === 'added').reduce((s: number, i: any) => s + i.price, 0)) *
+                line.qty,
+            })),
+            showVat: prefs.vatIncluded,
+            subtotal: order.totals.subtotal,
+            vatLines: order.totals.vatLines,
+            total: order.totals.total,
+            payments: [],
+            change: 0,
+            footer: `${meta.footer ?? ''}${meta.footer ? ' · ' : ''}ON HESAP - ODEME ALINMADI`,
+          }),
+        ],
+      )
+      broadcast('print')
+      return { ok: true }
+    })
+
     // Yanlış açılan adisyonu iptal et (yönetici, ödeme alınmamışsa)
     scope.post('/api/orders/:id/void', async (req) => {
       requireRole(user(req), ['manager'])

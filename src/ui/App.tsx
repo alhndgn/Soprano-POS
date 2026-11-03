@@ -42,8 +42,8 @@ function Icon({ d }: { d: string }) {
 
 const NAV = [
   { to: '/tables', label: 'Masalar', icon: 'M4 6h16M4 12h16M4 18h16' },
-  { to: '/takeaway', label: 'Gel Al', icon: 'M6 8h12l-1 12H7L6 8zm3 0a3 3 0 016 0' },
   { to: '/kds', label: 'Mutfak', icon: 'M4 10h16M6 10V6h12v4M7 10v10M17 10v10' },
+  { to: '/takeaway', label: 'Gel Al', icon: 'M6 8h12l-1 12H7L6 8zm3 0a3 3 0 016 0' },
   { to: '/reports', label: 'Rapor', icon: 'M4 19V5m0 14h16M8 15v-4m4 4V8m4 7v-6' },
   { to: '/admin', label: 'Yönetim', icon: 'M12 4l2.1 4.3 4.7.7-3.4 3.3.8 4.7L12 15l-4.2 2 .8-4.7L5.2 9l4.7-.7L12 4z' },
 ]

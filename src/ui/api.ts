@@ -282,6 +282,9 @@ export const api = {
   voidOrder: (orderId: number, reason = 'Adisyon iptali') =>
     request<{ ok: boolean; orderId: number }>('POST', `/api/orders/${orderId}/void`, { reason }),
   move: (orderId: number, tableId: number) => request<Order>('POST', `/api/orders/${orderId}/move`, { tableId }),
+  mergeOrders: (orderId: number, targetOrderId: number) =>
+    request<Order>('POST', `/api/orders/${orderId}/merge`, { targetOrderId }),
+  printOrder: (orderId: number) => request<{ ok: boolean }>('POST', `/api/orders/${orderId}/print`),
   pay: (orderId: number, body: PaymentPayload | { method: 'cash' | 'card' | 'other'; amount: number }[]) => {
     const payload: PaymentPayload = Array.isArray(body)
       ? { payments: body.map((payment) => ({ ...payment, allocations: [] })) }

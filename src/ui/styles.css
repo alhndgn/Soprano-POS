@@ -1379,6 +1379,44 @@ small { font-size: 12px; }
   .payment-foot .btn { min-height: 40px; }
 }
 
+
+/* ---------- masa üç nokta menüsü ---------- */
+.plan-cell { position: absolute; }
+.plan-cell > .plan-table { position: absolute; inset: 0; width: 100%; height: 100%; }
+.table-cell { position: relative; min-width: 0; display: flex; }
+.table-cell > .table-tile { width: 100%; }
+.table-menu-trigger {
+  position: absolute; top: 6px; right: 6px; z-index: 3;
+  width: 30px; height: 30px; border-radius: 10px;
+  display: grid; place-items: center; line-height: 1;
+  border: 1px solid var(--line-strong);
+  background: rgba(255, 255, 255, .94); color: var(--muted);
+  font-size: 16px; font-weight: 800;
+  box-shadow: 0 2px 8px rgba(16, 24, 40, .10);
+}
+.table-menu-trigger:hover { color: var(--text); border-color: var(--accent); background: #fff; }
+[data-theme='dark'] .table-menu-trigger { background: rgba(23, 28, 35, .95); }
+
+.table-menu { width: min(430px, 100%); }
+.table-menu h3 { margin: 2px 0 14px; }
+.table-menu-list { display: grid; gap: 7px; }
+.table-menu-list button {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 11px 14px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--panel); color: var(--text); text-align: left;
+  transition: border-color .13s ease, background .13s ease;
+}
+.table-menu-list button:hover { border-color: var(--accent-line); background: var(--accent-soft); }
+.table-menu-list button b { font-size: 13.5px; }
+.table-menu-list button small { color: var(--muted); font-size: 11px; }
+.table-menu-list button.danger { color: var(--danger); border-color: rgba(217, 30, 46, .28); }
+.table-menu-list button.danger small { color: rgba(217, 30, 46, .75); }
+.table-menu-list button:disabled { opacity: .5; }
+
+.add-table-modal { width: min(380px, 100%); }
+.add-table-modal .field { margin-top: 12px; }
+.toast.ok { background: #e9f9f0; border-color: #93dcb7; color: #0b6b45; }
+
 /* ---------- TeqStudio imzası (filigram) ---------- */
 .studio-badge {
   display: flex; align-items: center; justify-content: center; gap: 6px;

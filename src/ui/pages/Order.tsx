@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useApp } from '../App.tsx'
 import { api, elapsed, lineTotal, money, type Order, type OrderLine, type Product } from '../api.ts'
 import PaymentModal from '../components/PaymentModal.tsx'
@@ -28,6 +28,7 @@ export default function OrderPage() {
   const [sheet, setSheet] = useState<SheetState | null>(null)
   const [infoProduct, setInfoProduct] = useState<Product | null>(null)
   const [payOpen, setPayOpen] = useState(false)
+  const [params, setParams] = useSearchParams()
   const [successFx, setSuccessFx] = useState(false)
   const [voidOpen, setVoidOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -36,6 +37,15 @@ export default function OrderPage() {
   const [lineDetail, setLineDetail] = useState<OrderLine | null>(null)
   const [sentFx, setSentFx] = useState(false)
   const [lineNote, setLineNote] = useState('')
+
+  // Masalar ekranındaki "Öde" kısayolu: /order/:id?pay=1 → ödeme ekranını aç.
+  useEffect(() => {
+    if (params.get('pay') === '1' && order && order.status === 'open') {
+      setPayOpen(true)
+      params.delete('pay')
+      setParams(params, { replace: true })
+    }
+  }, [params, order, setParams])
 
   const prefs = boot?.prefs
   const detailOn = prefs?.orderDetail !== false
