@@ -393,7 +393,6 @@ export const api = {
 
   // ayarlar
   settings: () => request<{ prefs: Prefs }>('GET', '/api/admin/settings'),
-  settings: () => request<{ prefs: Prefs }>('GET', '/api/admin/settings'),
   saveSettings: (patch: Partial<Prefs>) => request<{ prefs: Prefs }>('PUT', '/api/admin/settings', patch),
   uploadCategoryImage: async (categoryId: number, file: File) => {
     const token = auth.get()
