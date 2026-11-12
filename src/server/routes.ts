@@ -36,15 +36,39 @@ async function appVersion(): Promise<{ version: string; commit: string }> {
   } catch {
     /* yoksay */
   }
-  try {
-    const { stdout } = await promisify(execFile)('git', ['rev-parse', '--short', 'HEAD'], {
-      cwd: process.cwd(),
-      timeout: 5000,
-      windowsHide: true,
-    })
-    commit = stdout.trim() || 'bilinmiyor'
-  } catch {
-    /* git yoksa sorun değil */
+  // Git PATH'te olmayabilir (tepsi/başlatıcı ortamı); bilinen yolları da dene.
+  const gitBins = [
+    'git',
+    'C:/Program Files/Git/cmd/git.exe',
+    'C:/Program Files (x86)/Git/cmd/git.exe',
+  ]
+  for (const bin of gitBins) {
+    try {
+      const { stdout } = await promisify(execFile)(bin, ['rev-parse', '--short', 'HEAD'], {
+        cwd: process.cwd(),
+        timeout: 5000,
+        windowsHide: true,
+      })
+      commit = stdout.trim() || 'bilinmiyor'
+      if (commit !== 'bilinmiyor') break
+    } catch {
+      /* sıradaki yolu dene */
+    }
+  }
+  if (commit === 'bilinmiyor') {
+    // Son çare: .git dosyalarından oku
+    try {
+      const head = (await readFile(path.join(process.cwd(), '.git', 'HEAD'), 'utf8')).trim()
+      if (head.startsWith('ref:')) {
+        const ref = head.slice(4).trim()
+        const sha = (await readFile(path.join(process.cwd(), '.git', ref), 'utf8')).trim()
+        if (sha) commit = sha.slice(0, 7)
+      } else if (head) {
+        commit = head.slice(0, 7)
+      }
+    } catch {
+      /* yoksay */
+    }
   }
   versionCache = { version, commit }
   return versionCache
