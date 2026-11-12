@@ -1,5 +1,12 @@
 # Sürüm geçmişi
 
+## v0.2.2 — 2 Kasım 2026
+
+- Tek başlatıcı: `Soprano.vbs` — sunucu + yazıcı köprüsü birlikte, gizli pencerelerde
+- Sistem tepsisi simgesi: panele git, köprüyü yeniden başlat, günlükleri aç, durdur
+- Eski `Soprano-POS.bat` artık sadece yeni başlatıcıyı çağırıyor
+- `Soprano Kapat.bat` tepsi sürecini de kapatıyor
+
 ## v0.2.1 — 2 Kasım 2026
 
 - Tablet uyumu: sayfa artık kaydırılıyor, sepet ekranın altında yapışık kalıyor

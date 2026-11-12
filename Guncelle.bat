@@ -101,5 +101,5 @@ echo   Veriler korundu (var klasoru degismedi).
 echo   Uygulama simdi baslatiliyor...
 echo.
 
-start "" "%APP%\Soprano-POS.bat"
+start "" wscript.exe "%APP%\Soprano.vbs"
 exit /b 0

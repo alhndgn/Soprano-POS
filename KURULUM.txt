@@ -19,18 +19,19 @@ Kurulum için internet gerekir (paketler ilk seferde indirilir).
 2. Klasördeki  Kur.bat  dosyasına çift tıkla.
    - Paketleri indirir, arayüzü derler.
    - Sonunda "KURULUM TAMAM" yazar.
-3. Soprano POS.bat  dosyasına çift tıkla.
-   - Siyah pencere (sunucu) + küçültülmüş "Soprano Yazici" penceresi açılır.
-   - 6 saniye sonra tarayıcı açılır: http://localhost:8095
+3. Soprano.vbs  dosyasına çift tıkla.
+   - Hiçbir cmd penceresi açılmaz; sunucu ve yazıcı köprüsü arkada çalışır.
+   - Sağ altta (sistem tepsisinde) Soprano simgesi görünür.
+   - Tarayıcı otomatik açılır: http://localhost:8095
    - Giriş PIN'leri: 1234 yönetici / 1111 garson / 2222 kasiyer
 
-Bu iki pencere açık kaldığı sürece kasa çalışır.
+Tepsi simgesi göründüğü sürece kasa çalışır. Simgeye çift tıkla → panel açılır.
 
 
 3) KAPATMA
 ----------
-- Soprano Kapat.bat  (masaüstü kısayolu) → sunucu + yazıcı köprüsü kapanır.
-- veya sunucu penceresinde Ctrl+C, sonra pencereyi kapat.
+- Tepsi simgesine sağ tık → "Durdur ve çık"  (önerilen)
+- veya Soprano Kapat.bat → sunucu + yazıcı köprüsü kapanır.
 
 
 4) YAZICI AYARI (bir kez)
@@ -71,7 +72,7 @@ Geri yükleme: kopyayı aynı yere geri koy.
 
 Mevcut kasa verisini bu bilgisayardan diğerine taşımak için:
   eski bilgisayardaki  var  klasörünü, yeni kurulumun içine kopyala
-  (Kur.bat'ı çalıştırdıktan SONRA, Soprano POS.bat'tan ÖNCE).
+  (Kur.bat'ı çalıştırdıktan SONRA, Soprano.vbs'ten ÖNCE).
 
 
 7) GÜNCELLEME (Git ile — tek tık)
@@ -92,7 +93,7 @@ GIT İLE KURULUM (önerilen, güncelleme için şart)
   1. Git for Windows kur: https://git-scm.com/download/win
   2. cmd aç ve çalıştır:
        git clone https://github.com/KULLANICI/soprano-pos.git C:\Soprano
-  3. Klasörde Kur.bat, sonra Soprano POS.bat çalıştır.
+  3. Klasörde Kur.bat, sonra Soprano.vbs çalıştır.
 
 Notlar:
   - Depo özel (private) ise Git ilk seferde kullanıcı/token ister; bir kez girilir, hatırlanır.
@@ -105,9 +106,9 @@ Notlar:
 8) SORUN GİDERME
 ----------------
 - "Node.js / npm bulunamadi"  → Node.js kurulu değil; https://nodejs.org kur, Kur.bat'ı tekrar çalıştır.
-- "Soprano zaten calisiyor"   → Uygulama zaten açık; tarayıcı açılır. Kapatmak için Soprano Kapat.bat.
+- "Soprano zaten calisiyor"   → Uygulama zaten açık; tarayıcı açılır. Kapatmak için tepsi → Durdur ve çık.
 - "8095 portu kullanımda"     → Başka bir kopya açık olabilir: taskmgr'de node.exe'leri kapat veya Soprano Kapat.bat.
-- Fiş çıkmıyor                → "Soprano Yazici" penceresi açık mı? Yönetim > Yazıcılar > son işlerde hata mesajına bak.
+- Fiş çıkmıyor                → Tepsi → "Yazıcı köprüsünü yeniden başlat"; sonra Yönetim > Yazıcılar > son işler.
 - Tarayıcı açılmıyor          → Elle git: http://localhost:8095
 
 

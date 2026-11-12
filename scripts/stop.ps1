@@ -12,7 +12,12 @@ foreach ($p in $procs) {
     Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
 }
 
-# 8095 portunu dinleyen ne varsa (eski klasörden çalışan sunucu dahil) kapat
+# 2) Tepsi simgesini yöneten PowerShell süreci
+Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" |
+    Where-Object { $_.CommandLine -like '*tray.ps1*' } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+
+# 3) 8095 portunu dinleyen ne varsa (eski klasörden çalışan sunucu dahil) kapat
 $listeners = @(Get-NetTCPConnection -LocalPort 8095 -State Listen -ErrorAction SilentlyContinue)
 foreach ($c in $listeners) {
     if ($c.OwningProcess -gt 0) {
