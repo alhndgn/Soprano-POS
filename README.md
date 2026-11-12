@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="Sürüm" src="https://img.shields.io/badge/sürüm-0.2.0-e8323f?style=flat-square">
+  <img alt="Sürüm" src="https://img.shields.io/badge/sürüm-0.2.1-e8323f?style=flat-square">
   <img alt="Lisans: MIT" src="https://img.shields.io/badge/lisans-MIT-2ea44f?style=flat-square">
   <img alt="Node.js" src="https://img.shields.io/badge/Node.js-20%2B-339933?style=flat-square&logo=node.js&logoColor=white">
   <img alt="React 19" src="https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react&logoColor=0b0f14">
@@ -222,7 +222,7 @@ Issue ve PR açabilirsiniz. Büyük değişiklikler için önce bir issue'da kon
 
 ## Sürüm geçmişi
 
-Ayrıntılar: [CHANGELOG.md](CHANGELOG.md) — son sürüm **v0.2.0**.
+Ayrıntılar: [CHANGELOG.md](CHANGELOG.md) — son sürüm **v0.2.1**.
 
 ## Lisans
 

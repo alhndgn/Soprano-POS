@@ -1,5 +1,13 @@
 # Sürüm geçmişi
 
+## v0.2.1 — 2 Kasım 2026
+
+- Tablet uyumu: sayfa artık kaydırılıyor, sepet ekranın altında yapışık kalıyor
+- 900 px altında iki, 640 px altında tek kolon akışkan yerleşim
+- Modaller tablet ekranına göre sınırlandı (94vw / 90dvh)
+- Parmakla yakınlaştırma açıldı
+- Alt bileşenlerde (KPI, rapor, yönetim) yatay taşma giderildi
+
 ## v0.2.0 — 2 Kasım 2026
 
 Bu sürümde restoranın günlük akışını tamamlayan modüller eklendi.
