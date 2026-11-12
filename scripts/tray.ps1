@@ -7,6 +7,8 @@ Add-Type -AssemblyName System.Drawing
 
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
+New-Item -ItemType Directory -Force -Path (Join-Path $root 'var') | Out-Null
+try { Start-Transcript -Path (Join-Path $root 'var	ray.log') -Append | Out-Null } catch {}
 
 # Aynı anda ikinci bir tepsi simgesi açma
 $others = Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" |
@@ -98,6 +100,7 @@ $exitItem.add_Click({
     & (Join-Path $root 'scripts\stop.ps1') | Out-Null
     $ni.Visible = $false
     $ni.Dispose()
+    $form.Close()
     [System.Windows.Forms.Application]::Exit()
 })
 
@@ -111,4 +114,11 @@ if (Test-Port) {
     $ni.ShowBalloonTip(6000, 'Soprano POS', 'Sunucu başlatılamadı. Günlükleri aç ile var\server.log dosyasına bak.', [System.Windows.Forms.ToolTipIcon]::Error)
 }
 
-[System.Windows.Forms.Application]::Run()
+# Görünmez form: mesaj döngüsünü güvenilir biçimde ayakta tutar.
+$form = New-Object System.Windows.Forms.Form
+$form.ShowInTaskbar = $false
+$form.WindowState = 'Minimized'
+$form.Visible = $false
+$form.Add_Shown({ $form.Visible = $false })
+
+[System.Windows.Forms.Application]::Run($form)

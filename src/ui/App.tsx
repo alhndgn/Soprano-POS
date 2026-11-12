@@ -173,13 +173,7 @@ export default function App() {
             )}
           </nav>
           <div className="sidebar-foot">
-            <div className="who">
-              <div className="who-copy">
-                <b>{me?.name}</b>
-                <small>{me?.role === 'manager' ? 'Yönetici' : me?.role === 'cashier' ? 'Kasiyer' : 'Garson'}</small>
-              </div>
-            </div>
-            {/* Tema seçimi Yönetim → Ayarlar'da; menüde yer kaplamasın. */}
+            {/* Profil ve tema Ayarlar'da; menüde yer kaplamasın. */}
             <button
               type="button"
               className="btn ghost sm"

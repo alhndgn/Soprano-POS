@@ -1,5 +1,12 @@
 # Sürüm geçmişi
 
+## v0.2.3 — 2 Kasım 2026
+
+- Sol menüdeki profil alanı ve tema düğmesi kaldırıldı; ikisi de Yönetim → Ayarlar'da
+- Tablet/telefonda üst menü tam genişliğe yayıldı, taşma giderildi
+- Çıkış düğmesi tablette yazılı ve görünür (eski sürümde ekran dışına taşıyordu)
+- Kısa ekranlarda menü daraltıldı; TeqStudio rozeti yer açmak için gizleniyor
+
 ## v0.2.2 — 2 Kasım 2026
 
 - Tek başlatıcı: `Soprano.vbs` — sunucu + yazıcı köprüsü birlikte, gizli pencerelerde
