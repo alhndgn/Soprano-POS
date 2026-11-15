@@ -1329,6 +1329,21 @@ small { font-size: 12px; }
 .table-tile.busy small { color: #2f7a5b; font-weight: 600; }
 .table-tile .table-tile-free { color: var(--dim); letter-spacing: .06em; text-transform: uppercase; font-size: 10px; }
 
+/* Sade masa ekranı (masa detayı kapalı): yalnız kutular + ekleme kutusu */
+.tables-layout.simple { grid-template-columns: minmax(0, 1fr); }
+.table-tile.add-table-tile {
+  align-items: center; justify-content: center; gap: 2px;
+  border-style: dashed; border-width: 1.5px;
+  background: transparent; color: var(--muted); box-shadow: none;
+}
+.table-tile.add-table-tile:hover,
+.table-tile.add-table-tile:focus-visible {
+  border-color: var(--accent); color: var(--accent); background: var(--accent-soft);
+}
+.add-plus { font-size: 26px; line-height: 1; font-weight: 600; }
+.table-tile.add-table-tile b { font-size: 13px; }
+.page-simple { padding-top: 16px; }
+
 /* ---------- mutfak: renkli aksiyonlar + efekt ---------- */
 .kds-card.sent { border-left-color: #f59e0b; }
 .kds-card.preparing { border-left-color: #3b82f6; }

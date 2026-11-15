@@ -215,7 +215,8 @@ export default function Tables() {
   }
 
   return (
-    <div className="page">
+    <div className={`page${simpleMode ? ' page-simple' : ''}`}>
+      {!simpleMode && (
       <div className="page-head">
         <div className="head-actions">
           <div className="head-stat"><span>Dolu masa</span><b>{stats.busy}<small>/{stats.total}</small></b></div>
@@ -227,6 +228,7 @@ export default function Tables() {
           )}
         </div>
       </div>
+      )}
 
       {tableSections && (
         <div className="floors">
@@ -243,14 +245,6 @@ export default function Tables() {
               + Masa ekle
             </button>
           )}
-        </div>
-      )}
-
-      {!tableSections && me?.role === 'manager' && (
-        <div className="floors">
-          <button type="button" className="floor-tab add-table" onClick={openAddTable}>
-            + Masa ekle
-          </button>
         </div>
       )}
 
@@ -340,6 +334,13 @@ export default function Tables() {
                   </div>
                 )
               })}
+              {!tableDetail && me?.role === 'manager' && (
+                <button type="button" className="table-tile add-table-tile" onClick={openAddTable}>
+                  <span className="add-plus" aria-hidden="true">+</span>
+                  <b>Masa ekle</b>
+                  <small className="table-tile-free">{shownTables.length} masa</small>
+                </button>
+              )}
               {shownTables.length === 0 && (
                 <div className="plan-empty">
                   Masa yok.
@@ -351,6 +352,7 @@ export default function Tables() {
           )}
         </div>
 
+        {!simpleMode && (
         <aside className="side-panel panel">
           <div className="panel-head">
             <div>
@@ -396,6 +398,7 @@ export default function Tables() {
             <b>{money(stats.tableOpen)}</b>
           </div>
         </aside>
+        )}
       </div>
 
       {notice && <div className={`toast ${notice.kind === 'err' ? 'error' : 'ok'}`} role="status">{notice.text}</div>}

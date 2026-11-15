@@ -1,5 +1,11 @@
 # Sürüm geçmişi
 
+## v0.2.5 — 2 Kasım 2026
+
+- Masa detayı kapalıyken Masalar ekranı tamamen sade: üst istatistikler, kat sekmeleri ve sağ "açık adisyonlar" paneli gizleniyor
+- Izgara tam genişlikte; son kutuda **+ Masa ekle** — istediğin kadar masa ekleyebilirsin
+- Yeni masa yine otomatik görünür alana kayıyor ve yeşil vurgulanıyor
+
 ## v0.2.4 — 2 Kasım 2026
 
 - Masa ekleme: yeni masa otomatik görünür alana kaydırılıyor, yeşil vurgulanıyor; bildirimde toplam masa sayısı yazıyor
