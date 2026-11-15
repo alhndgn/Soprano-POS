@@ -173,7 +173,7 @@ export default function Tables() {
     if (!targetFloor || actionBusy) return
     setActionBusy(true)
     try {
-      await api.addTable({
+      const created = await api.addTable({
         floorId: targetFloor.id,
         name: addName.trim() || `Masa ${targetFloor.tables.length + 1}`,
         seats: 4,
@@ -181,7 +181,14 @@ export default function Tables() {
       })
       await refresh()
       setAddOpen(false)
-      notify('ok', 'Masa eklendi')
+      notify('ok', `${created.name} eklendi · ${allTables.length + 1} masa`)
+      // Yeni masa listenin sonunda; görünmesi için aşağı kaydır ve kısa süre vurgula.
+      window.setTimeout(() => {
+        const el = document.querySelector(`[data-table-id="${created.id}"]`)
+        el?.classList.add('just-added')
+        el?.scrollIntoView({ block: 'center' })
+        window.setTimeout(() => el?.classList.remove('just-added'), 2200)
+      }, 420)
     } catch (e: any) {
       notify('err', e.message)
     } finally {
@@ -312,7 +319,7 @@ export default function Tables() {
               {shownTables.map((t) => {
                 const o = t.order
                 return (
-                  <div className="table-cell" key={t.id}>
+                  <div className="table-cell" key={t.id} data-table-id={t.id}>
                     <button
                       type="button"
                       className={`table-tile${o ? ' busy' : ''}${busy === t.id ? ' loading' : ''}`}

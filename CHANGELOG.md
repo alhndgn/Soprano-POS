@@ -1,5 +1,12 @@
 # Sürüm geçmişi
 
+## v0.2.4 — 2 Kasım 2026
+
+- Masa ekleme: yeni masa otomatik görünür alana kaydırılıyor, yeşil vurgulanıyor; bildirimde toplam masa sayısı yazıyor
+- Masa ekle penceresinin butonları tablette ekranda kalıyor (yapışkan alt satır)
+- Başlatıcı sağlamlaştırıldı: sunucu ve yazıcı köprüsü tepsi sürecinden bağımsız ayrı süreçlerde çalışıyor
+- `scripts/run-hidden.bat` Node/npm yolunu kendisi buluyor; PATH kaynaklı "npm tanınmıyor" hatası giderildi
+
 ## v0.2.3 — 2 Kasım 2026
 
 - Sol menüdeki profil alanı ve tema düğmesi kaldırıldı; ikisi de Yönetim → Ayarlar'da

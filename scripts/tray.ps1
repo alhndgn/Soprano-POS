@@ -32,19 +32,19 @@ function Test-Port {
     return [bool](Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue)
 }
 
-function Start-Server {
-    Start-Process -FilePath 'cmd.exe' `
-        -ArgumentList '/c', "npm start > `"$root\var\server.log`" 2>&1" `
-        -WorkingDirectory $root -WindowStyle Hidden | Out-Null
+function Start-Detached([string]$what) {
+    # WMI ile baslat: tepsi kapansa bile sunucu/kopru yasar.
+    $line = 'cmd.exe /c ""' + $root + '\scripts\run-hidden.bat" ' + $what + '"'
+    Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $line } | Out-Null
 }
+
+function Start-Server { Start-Detached 'server' }
 
 function Start-Bridge {
     $bridge = Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
         Where-Object { $_.CommandLine -like '*src/bridge*' }
     if ($bridge) { return }
-    Start-Process -FilePath 'cmd.exe' `
-        -ArgumentList '/c', "npm run bridge > `"$root\var\bridge.log`" 2>&1" `
-        -WorkingDirectory $root -WindowStyle Hidden | Out-Null
+    Start-Detached 'bridge'
 }
 
 function Restart-Bridge {
